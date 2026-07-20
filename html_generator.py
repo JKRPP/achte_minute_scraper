@@ -161,7 +161,6 @@ TEMPLATE = """<!doctype html>
 <body>
 <header>
   <h1>{title}</h1>
-  <div class="subtitle">{count} Themen insgesamt.</div>
   <div class="controls">
     <input type="search" id="search" placeholder="Suche in Thema, Factsheet, Runde...">
     <select id="yearFilter"><option value="">Alle Jahre</option></select>
@@ -283,7 +282,7 @@ def generate_html(csv_path: Path, html_path: Path) -> None:
 
     records = df.to_dict(orient="records")
     html = TEMPLATE.format(
-        title=f"Achte Minute &ndash; Themen ({csv_path.stem})",
+        title=f"Achte Minute Themen",
         count=len(records),
         source=csv_path.name,
         data_json=json.dumps(records, ensure_ascii=False),
