@@ -1,5 +1,4 @@
 version: "3.8"
-
 services:
   web:
     image: nginx:alpine
@@ -7,5 +6,5 @@ services:
     ports:
       - "8085:80"
     volumes:
-      - /home/user/motion-site:/usr/share/nginx/html:ro
+      - ./:/usr/share/nginx/html:ro
     restart: unless-stopped
