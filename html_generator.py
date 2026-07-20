@@ -161,7 +161,7 @@ TEMPLATE = """<!doctype html>
 <body>
 <header>
   <h1>{title}</h1>
-  <div class="subtitle">{count} Themen &middot; erzeugt aus {source}</div>
+  <div class="subtitle">{count} Themen insgesamt.</div>
   <div class="controls">
     <input type="search" id="search" placeholder="Suche in Thema, Factsheet, Runde...">
     <select id="yearFilter"><option value="">Alle Jahre</option></select>
@@ -295,5 +295,5 @@ def generate_html(csv_path: Path, html_path: Path) -> None:
 if __name__ == "__main__":
     csv_arg = sys.argv[1] if len(sys.argv) > 1 else "topics.csv"
     csv_path = Path(csv_arg)
-    html_path = csv_path.with_suffix(".html")
+    html_path = Path("index.html")
     generate_html(csv_path, html_path)
