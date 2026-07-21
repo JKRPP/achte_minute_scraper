@@ -8,3 +8,11 @@ services:
     volumes:
       - ./:/usr/share/nginx/html:ro
     restart: unless-stopped
+    networks:
+      - default
+      - proxy
+
+networks:
+  proxy:
+    name: ${PROXY_NETWORK}
+    external: true
