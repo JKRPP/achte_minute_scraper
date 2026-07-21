@@ -2,6 +2,7 @@
 Generates a single self-contained HTML page (searchable/sortable table) from
 one of the topics_*.csv files produced by scraping.py.
 """
+
 import json
 import sys
 from pathlib import Path
@@ -119,6 +120,10 @@ TEMPLATE = """<!doctype html>
   }}
   thead th:hover {{ color: var(--text); }}
   thead th.active {{ color: var(--accent); }}
+  th.col-datum {{ width: 6rem; }}
+  th.col-runde {{ width: 6rem; }}
+  th.col-thema {{ width: 36%; }}
+  th.col-link {{ width: 5rem; }}
   tbody td {{
     padding: .8rem 1rem;
     border-bottom: 1px solid var(--border);
@@ -156,6 +161,13 @@ TEMPLATE = """<!doctype html>
     font-size: .75rem;
     font-weight: 600;
   }}
+  @media (orientation: portrait) {{
+    th.col-thema, th.col-factsheet {{ width: 50%; }}
+    th.col-datum, th.col-runde, th.col-link,
+    td.col-datum, td.col-runde, td.col-link {{
+      display: none;
+    }}
+  }}
 </style>
 </head>
 <body>
@@ -170,20 +182,13 @@ TEMPLATE = """<!doctype html>
 <main>
   <div class="card">
     <table>
-      <colgroup>
-        <col style="width: 6rem">
-        <col style="width: 8rem">
-        <col style="width: 36%">
-        <col>
-        <col style="width: 5rem">
-      </colgroup>
       <thead>
         <tr>
-          <th data-key="Datum">Datum</th>
-          <th data-key="Runde">Runde</th>
-          <th data-key="Thema">Thema</th>
-          <th data-key="Factsheet">Factsheet</th>
-          <th data-key="Link">Quelle</th>
+          <th class="col-datum" data-key="Datum">Datum</th>
+          <th class="col-runde" data-key="Runde">Runde</th>
+          <th class="col-thema" data-key="Thema">Thema</th>
+          <th class="col-factsheet" data-key="Factsheet">Factsheet</th>
+          <th class="col-link" data-key="Link">Quelle</th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
@@ -238,11 +243,11 @@ function render() {{
 
   rowsEl.innerHTML = filtered.map(d => `
     <tr>
-      <td class="datum">${{escapeHtml(d.Datum)}}</td>
-      <td class="runde"><span class="badge">${{escapeHtml(d.Runde)}}</span></td>
+      <td class="datum col-datum">${{escapeHtml(d.Datum)}}</td>
+      <td class="runde col-runde"><span class="badge">${{escapeHtml(d.Runde)}}</span></td>
       <td class="thema">${{escapeHtml(d.Thema)}}</td>
       <td class="factsheet">${{escapeHtml(d.Factsheet)}}</td>
-      <td><a class="link" href="${{escapeHtml(d.Link)}}" target="_blank" rel="noopener">Artikel &#8599;</a></td>
+      <td class="col-link"><a class="link" href="${{escapeHtml(d.Link)}}" target="_blank" rel="noopener">Artikel &#8599;</a></td>
     </tr>
   `).join('');
 
@@ -277,7 +282,9 @@ render();
 
 def generate_html(csv_path: Path, html_path: Path) -> None:
     df = pd.read_csv(csv_path)
-    df = df[[c for c in ("Runde", "Thema", "Factsheet", "Link", "Datum") if c in df.columns]]
+    df = df[
+        [c for c in ("Runde", "Thema", "Factsheet", "Link", "Datum") if c in df.columns]
+    ]
     df = df.fillna("")
 
     records = df.to_dict(orient="records")
