@@ -163,3 +163,4 @@ if __name__ == "__main__":
     cleaned_df = clean_df(merged_df)
     print(f"Writing {len(cleaned_df)} topics to csv.")
     cleaned_df.to_csv("topics.csv")
+    merged_df.to_csv("topics_full.csv")

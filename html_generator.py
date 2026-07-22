@@ -121,7 +121,8 @@ TEMPLATE = """<!doctype html>
   thead th:hover {{ color: var(--text); }}
   thead th.active {{ color: var(--accent); }}
   th.col-datum {{ width: 6rem; }}
-  th.col-runde {{ width: 6rem; }}
+  th.col-runde {{ width: 5rem; }}
+  th.col-format {{ width: 5rem; }}
   th.col-thema {{ width: 36%; }}
   th.col-link {{ width: 5rem; }}
   tbody td {{
@@ -140,6 +141,7 @@ TEMPLATE = """<!doctype html>
     color: var(--accent);
   }}
   td.datum {{ white-space: nowrap; color: var(--muted); }}
+  td.format {{ white-space: nowrap; color: var(--muted); }}
   td.factsheet {{ color: var(--muted); }}
   a.link {{
     color: var(--muted);
@@ -161,10 +163,14 @@ TEMPLATE = """<!doctype html>
     font-size: .75rem;
     font-weight: 600;
   }}
+  .badge-format {{
+    background: var(--muted);
+    color: var(--card);
+  }}
   @media (orientation: portrait) {{
     th.col-thema, th.col-factsheet {{ width: 50%; }}
-    th.col-datum, th.col-runde, th.col-link,
-    td.col-datum, td.col-runde, td.col-link {{
+    th.col-datum, th.col-runde, th.col-format, th.col-link,
+    td.col-datum, td.col-runde, td.col-format, td.col-link {{
       display: none;
     }}
   }}
@@ -176,6 +182,7 @@ TEMPLATE = """<!doctype html>
   <div class="controls">
     <input type="search" id="search" placeholder="Suche in Thema, Factsheet, Runde...">
     <select id="yearFilter"><option value="">Alle Jahre</option></select>
+    <select id="formatFilter"><option value="">Alle Formate</option></select>
   </div>
   <div class="count" id="resultCount"></div>
 </header>
@@ -186,6 +193,7 @@ TEMPLATE = """<!doctype html>
         <tr>
           <th class="col-datum" data-key="Datum">Datum</th>
           <th class="col-runde" data-key="Runde">Runde</th>
+          <th class="col-format" data-key="Format">Format</th>
           <th class="col-thema" data-key="Thema">Thema</th>
           <th class="col-factsheet" data-key="Factsheet">Factsheet</th>
           <th class="col-link" data-key="Link">Quelle</th>
@@ -203,6 +211,7 @@ const DATA = {data_json};
 const rowsEl = document.getElementById('rows');
 const searchEl = document.getElementById('search');
 const yearEl = document.getElementById('yearFilter');
+const formatEl = document.getElementById('formatFilter');
 const countEl = document.getElementById('resultCount');
 const emptyEl = document.getElementById('emptyState');
 
@@ -218,6 +227,15 @@ for (const y of yearValues) {{
   yearEl.appendChild(opt);
 }}
 
+const formatValues = [...new Set(DATA.map(d => d.Format ?? ''))]
+  .filter(Boolean).sort();
+for (const f of formatValues) {{
+  const opt = document.createElement('option');
+  opt.value = f;
+  opt.textContent = f;
+  formatEl.appendChild(opt);
+}}
+
 function escapeHtml(s) {{
   return (s ?? '').toString()
     .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
@@ -226,13 +244,16 @@ function escapeHtml(s) {{
 function render() {{
   const q = searchEl.value.trim().toLowerCase();
   const yearFilter = yearEl.value;
+  const formatFilter = formatEl.value;
 
   let filtered = DATA.filter(d => {{
     if (yearFilter && !(d.Datum ?? '').startsWith(yearFilter)) return false;
+    if (formatFilter && (d.Format ?? '') !== formatFilter) return false;
     if (!q) return true;
     return (d.Thema ?? '').toLowerCase().includes(q)
       || (d.Factsheet ?? '').toLowerCase().includes(q)
-      || (d.Runde ?? '').toLowerCase().includes(q);
+      || (d.Runde ?? '').toLowerCase().includes(q)
+      || (d.Format ?? '').toLowerCase().includes(q);
   }});
 
   filtered.sort((a, b) => {{
@@ -245,6 +266,7 @@ function render() {{
     <tr>
       <td class="datum col-datum">${{escapeHtml(d.Datum)}}</td>
       <td class="runde col-runde"><span class="badge">${{escapeHtml(d.Runde)}}</span></td>
+      <td class="format col-format"><span class="badge badge-format">${{escapeHtml(d.Format)}}</span></td>
       <td class="thema">${{escapeHtml(d.Thema)}}</td>
       <td class="factsheet">${{escapeHtml(d.Factsheet)}}</td>
       <td class="col-link"><a class="link" href="${{escapeHtml(d.Link)}}" target="_blank" rel="noopener">Artikel &#8599;</a></td>
@@ -272,6 +294,7 @@ document.querySelectorAll('thead th').forEach(th => {{
 
 searchEl.addEventListener('input', render);
 yearEl.addEventListener('change', render);
+formatEl.addEventListener('change', render);
 
 render();
 </script>
@@ -283,7 +306,11 @@ render();
 def generate_html(csv_path: Path, html_path: Path) -> None:
     df = pd.read_csv(csv_path)
     df = df[
-        [c for c in ("Runde", "Thema", "Factsheet", "Link", "Datum") if c in df.columns]
+        [
+            c
+            for c in ("Runde", "Format", "Thema", "Factsheet", "Link", "Datum")
+            if c in df.columns
+        ]
     ]
     df = df.fillna("")
 

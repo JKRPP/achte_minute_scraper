@@ -6,14 +6,14 @@ from typing import List, Optional, Dict
 import pandas as pd
 from tqdm import tqdm
 
+_QUOTE_CHARS = "\"'„“”‚‘’«»"
 
-
-_QUOTE_CHARS = '"\'„“”‚‘’«»'
-
-_LABEL_WORD_RE = re.compile(r'^([A-Za-zÀ-ÿ]+)\s*:?\s*')
+_LABEL_WORD_RE = re.compile(r"^([A-Za-zÀ-ÿ]+)\s*:?\s*")
 _LABEL_STEMS = ("info", "fact", "definition")
-_DATE_IN_URL_RE = re.compile(r'/(\d{8})/')
-_ROUND_LABEL_LINE_RE = re.compile(r'^([A-Za-zÄÖÜäöüß\-]{1,25}\s?[0-9]{0,3}):\s*(.*)$')
+_DATE_IN_URL_RE = re.compile(r"/(\d{8})/")
+_ROUND_LABEL_LINE_RE = re.compile(
+    r"^\(?([A-Za-zÄÖÜäöüß\-]{1,25}\s?[0-9]{0,3}):\s*(.*)$", re.DOTALL
+)
 
 
 def get_article_links_from_month(year: int, month: int) -> List[str]:
@@ -35,28 +35,35 @@ def get_article_links_from_month(year: int, month: int) -> List[str]:
         print(f"Error fetching {url}: {e}")
         return []
 
-    soup = BeautifulSoup(response.content, 'html.parser')
-    article_pattern = re.compile(rf"^https://www\.achteminute\.de/{year}{month:02d}\d{{2}}/.+/$")
+    soup = BeautifulSoup(response.content, "html.parser")
+    article_pattern = re.compile(
+        rf"^https://www\.achteminute\.de/{year}{month:02d}\d{{2}}/.+/$"
+    )
 
     article_links = []
-    for a_tag in soup.find_all('a', href=True, rel="bookmark"):
-        href = a_tag['href']
+    for a_tag in soup.find_all("a", href=True, rel="bookmark"):
+        href = a_tag["href"]
         if article_pattern.match(href) and href not in article_links:
             article_links.append(href)
 
     return article_links
 
-def get_all_article_links(start_year: int = 2026, start_month: int = 1, 
-                          end_year: Optional[int] = None, end_month: Optional[int] = None) -> List[str]:
+
+def get_all_article_links(
+    start_year: int = 2026,
+    start_month: int = 1,
+    end_year: Optional[int] = None,
+    end_month: Optional[int] = None,
+) -> List[str]:
     """
     Iterates through a range of months and collects all article links.
-    
+
     Args:
         start_year: The year to start from (default: 2026).
         start_month: The month to start from (default: 1 for January).
         end_year: The year to end at (inclusive). If None, uses the current month.
         end_month: The month to end at (inclusive). If None, uses the current month.
-        
+
     Returns:
         A combined list of all article URLs from the specified range.
     """
@@ -66,20 +73,22 @@ def get_all_article_links(start_year: int = 2026, start_month: int = 1,
         today = datetime.now()
         end_year = today.year
         end_month = today.month
-        
+
     current_date = datetime(start_year, start_month, 1)
     end_date = datetime(end_year, end_month, 1)
-    
+
     while current_date <= end_date:
         print(f"Fetching links for {current_date.strftime('%B %Y')}...")
-        month_links = get_article_links_from_month(current_date.year, current_date.month)
+        month_links = get_article_links_from_month(
+            current_date.year, current_date.month
+        )
         all_links.extend(month_links)
-        
+
         if current_date.month == 12:
             current_date = datetime(current_date.year + 1, 1, 1)
         else:
             current_date = datetime(current_date.year, current_date.month + 1, 1)
-            
+
     return all_links
 
 
@@ -89,7 +98,7 @@ def extract_date_from_url(url: str) -> Optional[str]:
     if not match:
         return None
     try:
-        return datetime.strptime(match.group(1), '%Y%m%d').date().isoformat()
+        return datetime.strptime(match.group(1), "%Y%m%d").date().isoformat()
     except ValueError:
         return None
 
@@ -100,23 +109,31 @@ def _blockquote_segments(blockquote) -> List[str]:
     label per segment).
     """
     segments = []
-    for p in blockquote.find_all('p'):
-        current = []
+    for p in blockquote.find_all("p"):
+        current = ""
         br_run = 0
         for descendant in p.descendants:
             if isinstance(descendant, NavigableString):
-                text = str(descendant).strip()
-                if text:
-                    current.append(text)
+                current += str(descendant)
+                if str(descendant).strip():
                     br_run = 0
-            elif descendant.name == 'br':
+            elif descendant.name == "br":
                 br_run += 1
-                if br_run >= 2 and current:
-                    segments.append(' '.join(current))
-                    current = []
-        if current:
-            segments.append(' '.join(current))
+                if br_run >= 2 and current.strip():
+                    segments.append(current.strip())
+                    current = ""
+            elif descendant.name == "strong":
+                # A <strong> tag always opens a new round label, even when
+                # it's embedded mid-paragraph alongside earlier content
+                # (rather than in its own <p>), so force a split here too.
+                if current.strip():
+                    segments.append(current.strip())
+                    current = ""
+                br_run = 0
+        if current.strip():
+            segments.append(current.strip())
     return segments
+
 
 def _strip_quotes(text: str) -> str:
     """Strips a single leading/trailing quote mark, if both are present."""
@@ -144,12 +161,14 @@ def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, 
     if factsheet_parts:
         info_match = _LABEL_WORD_RE.match(factsheet_parts[0])
         if info_match and info_match.group(1).lower().startswith(_LABEL_STEMS):
-            factsheet_parts[0] = factsheet_parts[0][info_match.end():].strip()
+            factsheet_parts[0] = factsheet_parts[0][info_match.end() :].strip()
 
     return {
         "Runde": round_label,
         "Thema": _strip_quotes(topic),
-        "Factsheet": _strip_quotes(' '.join(part for part in factsheet_parts if part).strip()),
+        "Factsheet": _strip_quotes(
+            " ".join(part for part in factsheet_parts if part).strip()
+        ),
     }
 
 
@@ -171,11 +190,11 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
         print(f"Error fetching {url}: {e}")
         return []
 
-    soup = BeautifulSoup(response.content, 'html.parser')
+    soup = BeautifulSoup(response.content, "html.parser")
     date = extract_date_from_url(url)
 
     entries = []
-    for blockquote in soup.find_all('blockquote'):
+    for blockquote in soup.find_all("blockquote"):
         current_round = None
         current_content: List[str] = []
 
@@ -189,6 +208,8 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
 
                 current_round = label_match.group(1).strip()
                 remainder = label_match.group(2).strip()
+                if segment.startswith("(") and remainder.endswith(")"):
+                    remainder = remainder[:-1].strip()
                 current_content = [remainder] if remainder else []
             else:
                 if current_round is None:
@@ -202,18 +223,25 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
     for entry in entries:
         entry["Link"] = url
         entry["Datum"] = date
+        if "?" in entry["Thema"]:
+            entry["Format"] = "OPD"
+        else:
+            entry["Format"] = "BP"
 
     return entries
 
+
 if __name__ == "__main__":
-    first_year = 2013
+    first_year = 2026
     last_year = datetime.now().year
 
     current_year = first_year
 
     while current_year <= last_year:
         print(f"Getting topics from {current_year}")
-        all_links = get_all_article_links(start_year=current_year, start_month=1, end_year=current_year, end_month=12)
+        all_links = get_all_article_links(
+            start_year=current_year, start_month=1, end_year=current_year, end_month=12
+        )
         all_topics = []
         for link in tqdm(all_links):
             all_topics.extend(extract_topics_from_article(link))
