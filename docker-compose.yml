@@ -12,6 +12,17 @@ services:
       - default
       - proxy
 
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile.scraper
+    container_name: motion-scraper
+    volumes:
+      - ./:/app
+    restart: unless-stopped
+    networks:
+      - default
+
 networks:
   proxy:
     name: ${PROXY_NETWORK}

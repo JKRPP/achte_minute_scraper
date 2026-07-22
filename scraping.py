@@ -1,10 +1,10 @@
+from pathlib import Path
 import re
 import requests
 from bs4 import BeautifulSoup, NavigableString
 from datetime import datetime
 from typing import List, Optional, Dict
 import pandas as pd
-from tqdm import tqdm
 
 _QUOTE_CHARS = "\"'„“”‚‘’«»"
 
@@ -231,21 +231,31 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
     return entries
 
 
-if __name__ == "__main__":
-    first_year = 2026
+def initial_generation():
+    first_year = 2013
     last_year = datetime.now().year
 
     current_year = first_year
 
     while current_year <= last_year:
         print(f"Getting topics from {current_year}")
+        if Path(f"topics_{current_year}.csv").exists():
+            print(
+                f"File topics_{current_year}.csv already exists. Skipping file in initial generation."
+            )
+            current_year += 1
+            continue
         all_links = get_all_article_links(
             start_year=current_year, start_month=1, end_year=current_year, end_month=12
         )
         all_topics = []
-        for link in tqdm(all_links):
+        for link in all_links:
             all_topics.extend(extract_topics_from_article(link))
 
         topic_df = pd.DataFrame(all_topics)
         topic_df.to_csv(f"topics_{current_year}.csv")
         current_year += 1
+
+
+if __name__ == "__main__":
+    initial_generation()
