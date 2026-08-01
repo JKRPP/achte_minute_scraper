@@ -172,6 +172,7 @@ def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, 
         ),
     }
 
+
 def _extract_article_body(full_soup: BeautifulSoup) -> BeautifulSoup:
     """
     Trims a full achteminute.de page down to the article itself (title,
@@ -201,15 +202,16 @@ def _extract_article_body(full_soup: BeautifulSoup) -> BeautifulSoup:
 
 
 def _download_article(url: str, overwrite=False):
-    fileName = "articles/" +url.removeprefix("https://www.achteminute.de/").replace("/","_").removesuffix("_")
-
+    fileName = "articles/" + url.removeprefix("https://www.achteminute.de/").replace(
+        "/", "_"
+    ).removesuffix("_")
 
     print(fileName)
 
     if os.path.exists(fileName) and not overwrite:
         with open(fileName, "r", encoding="utf-8") as f:
             html_string = f.read()
-            soup = BeautifulSoup(html_string, 'html.parser')
+            soup = BeautifulSoup(html_string, "html.parser")
         return soup
 
     try:
@@ -220,6 +222,7 @@ def _download_article(url: str, overwrite=False):
         return []
 
     soup = _extract_article_body(BeautifulSoup(response.content, "html.parser"))
+    Path("articles/").mkdir(parents=True, exist_ok=True)
     with open(fileName, "w", encoding="utf-8") as f:
         f.write(str(soup))
         f.close()
