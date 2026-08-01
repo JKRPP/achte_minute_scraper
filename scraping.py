@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup, NavigableString
 from datetime import datetime
 from typing import List, Optional, Dict
 import pandas as pd
+import os
 
 _QUOTE_CHARS = "\"'„“”‚‘’«»"
 
@@ -171,6 +172,60 @@ def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, 
         ),
     }
 
+def _extract_article_body(full_soup: BeautifulSoup) -> BeautifulSoup:
+    """
+    Trims a full achteminute.de page down to the article itself (title,
+    date/author/category, body, tags), dropping page chrome - global
+    styling, navigation, sidebar widgets, comments, booking forms - that
+    bloats saved files without adding any topic-relevant content.
+
+    The article lives in <div class="post">; the tag list ("Schlagworte")
+    that follows it as a sibling <small> is kept too since it's still
+    article metadata, just placed outside that div by the page markup.
+    """
+    post = full_soup.find("div", class_="post")
+    if post is None:
+        return full_soup
+
+    for button in post.find_all(class_="printfriendly"):
+        button.decompose()
+
+    tags = post.find_next_sibling("small")
+
+    trimmed = BeautifulSoup("", "html.parser")
+    trimmed.append(post.extract())
+    if tags is not None:
+        trimmed.append(tags.extract())
+
+    return trimmed
+
+
+def _download_article(url: str, overwrite=False):
+    fileName = "articles/" +url.removeprefix("https://www.achteminute.de/").replace("/","_").removesuffix("_")
+
+
+    print(fileName)
+
+    if os.path.exists(fileName) and not overwrite:
+        with open(fileName, "r", encoding="utf-8") as f:
+            html_string = f.read()
+            soup = BeautifulSoup(html_string, 'html.parser')
+        return soup
+
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+    except requests.RequestException as e:
+        print(f"Error fetching {url}: {e}")
+        return []
+
+    soup = _extract_article_body(BeautifulSoup(response.content, "html.parser"))
+    with open(fileName, "w", encoding="utf-8") as f:
+        f.write(str(soup))
+        f.close()
+
+    return soup
+
 
 def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
     """
@@ -183,14 +238,7 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
         that round, with the last one being the topic and everything before
         it forming the factsheet (see _finalize_round).
     """
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-    except requests.RequestException as e:
-        print(f"Error fetching {url}: {e}")
-        return []
-
-    soup = BeautifulSoup(response.content, "html.parser")
+    soup = _download_article(url)
     date = extract_date_from_url(url)
 
     entries = []
