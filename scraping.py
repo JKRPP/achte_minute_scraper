@@ -1,11 +1,17 @@
 from pathlib import Path
 import re
-import requests
+import time
+import httpx
 from bs4 import BeautifulSoup, NavigableString
 from datetime import datetime
 from typing import List, Optional, Dict
 import pandas as pd
 import os
+
+_http_client = httpx.Client(http2=True, headers={"User-Agent": "Mozilla/5.0"})
+
+_MAX_RETRIES = 3
+_RETRY_BACKOFF_SECONDS = 2
 
 _QUOTE_CHARS = "\"'„“”‚‘’«»"
 
@@ -15,6 +21,24 @@ _DATE_IN_URL_RE = re.compile(r"/(\d{8})/")
 _ROUND_LABEL_LINE_RE = re.compile(
     r"^\(?([A-Za-zÄÖÜäöüß\-]{1,25}\s?[0-9]{0,3}):\s*(.*)$", re.DOTALL
 )
+
+
+def _get(url: str) -> httpx.Response:
+    """
+    GETs a URL, retrying on transient connection failures (e.g. "Server
+    disconnected") with a short backoff, since achteminute.de occasionally
+    drops connections under no fault of the request itself.
+    """
+    _http_client.cookies.clear()
+    for attempt in range(1, _MAX_RETRIES + 1):
+        try:
+            response = _http_client.get(url)
+            response.raise_for_status()
+            return response
+        except httpx.TransportError:
+            if attempt == _MAX_RETRIES:
+                raise
+            time.sleep(_RETRY_BACKOFF_SECONDS * attempt)
 
 
 def get_article_links_from_month(year: int, month: int) -> List[str]:
@@ -30,9 +54,8 @@ def get_article_links_from_month(year: int, month: int) -> List[str]:
     """
     url = f"https://www.achteminute.de/{year}/{month:02d}/"
     try:
-        response = requests.get(url)
-        response.raise_for_status()
-    except requests.RequestException as e:
+        response = _get(url)
+    except httpx.HTTPError as e:
         print(f"Error fetching {url}: {e}")
         return []
 
@@ -206,8 +229,6 @@ def _download_article(url: str, overwrite=False):
         "/", "_"
     ).removesuffix("_")
 
-    print(fileName)
-
     if os.path.exists(fileName) and not overwrite:
         with open(fileName, "r", encoding="utf-8") as f:
             html_string = f.read()
@@ -215,9 +236,8 @@ def _download_article(url: str, overwrite=False):
         return soup
 
     try:
-        response = requests.get(url)
-        response.raise_for_status()
-    except requests.RequestException as e:
+        response = _get(url)
+    except httpx.HTTPError as e:
         print(f"Error fetching {url}: {e}")
         return []
 
@@ -282,15 +302,15 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
     return entries
 
 
-def initial_generation():
-    first_year = 2013
+def initial_generation(starting_year=2013, force_regenerate=False):
+    first_year = starting_year
     last_year = datetime.now().year
 
     current_year = first_year
 
     while current_year <= last_year:
         print(f"Getting topics from {current_year}")
-        if Path(f"topics_{current_year}.csv").exists():
+        if Path(f"topics_{current_year}.csv").exists() and not force_regenerate:
             print(
                 f"File topics_{current_year}.csv already exists. Skipping file in initial generation."
             )
@@ -301,7 +321,12 @@ def initial_generation():
         )
         all_topics = []
         for link in all_links:
-            all_topics.extend(extract_topics_from_article(link))
+            try:
+                all_topics.extend(extract_topics_from_article(link))
+            except:
+                print(
+                    f"WARNING: An exception occured while getting topics from {link}. Skipping article."
+                )
 
         topic_df = pd.DataFrame(all_topics)
         topic_df.to_csv(f"topics_{current_year}.csv")

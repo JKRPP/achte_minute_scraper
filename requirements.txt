@@ -1,3 +1,4 @@
 requests
+httpx[http2]
 beautifulsoup4
 pandas
