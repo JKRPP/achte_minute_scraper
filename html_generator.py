@@ -250,8 +250,14 @@ function escapeHtml(s) {{
     .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }}
 
+function normalizeForSearch(s) {{
+  return (s ?? '').toString().toLowerCase()
+    .replaceAll('ä', 'ae').replaceAll('ö', 'oe').replaceAll('ü', 'ue')
+    .replaceAll('ß', 'ss');
+}}
+
 function render() {{
-  const q = searchEl.value.trim().toLowerCase();
+  const q = normalizeForSearch(searchEl.value.trim());
   const yearFilter = yearEl.value;
   const formatFilter = formatEl.value;
 
@@ -259,11 +265,11 @@ function render() {{
     if (yearFilter && !(d.Datum ?? '').startsWith(yearFilter)) return false;
     if (formatFilter && (d.Format ?? '') !== formatFilter) return false;
     if (!q) return true;
-    return (d.Thema ?? '').toLowerCase().includes(q)
-      || (d.Factsheet ?? '').toLowerCase().includes(q)
-      || (d.Runde ?? '').toLowerCase().includes(q)
-      || (d.Format ?? '').toLowerCase().includes(q)
-      || (d.Tournament ?? '').toLowerCase().includes(q);
+    return normalizeForSearch(d.Thema).includes(q)
+      || normalizeForSearch(d.Factsheet).includes(q)
+      || normalizeForSearch(d.Runde).includes(q)
+      || normalizeForSearch(d.Format).includes(q)
+      || normalizeForSearch(d.Tournament).includes(q);
   }});
 
   filtered.sort((a, b) => {{
