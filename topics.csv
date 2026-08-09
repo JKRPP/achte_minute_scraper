@@ -1,2 +1,0 @@
-,Unnamed: 0,Runde,Thema,Factsheet,Link,Datum,Format,Unnamed: 0.2,Unnamed: 0.1
-8,14,F,"Hier werden Themen angezeigt","Hier wird das Factsheet angezeigt. Damit das Laden der Themen funktioniert, führe initial_generation() in scraping.py aus. Weitere Updates können mit check_and_regenerate() in new_topic_checker.py geladen werden. Wenn du die Website mithilfe der docker-compose.yml geklont hast, werden diese Schritte beim Start einmal automatisch und anschließend einmal pro Stunde automatisch durchgeführt.",https://www.achteminute.de/,1999-01-01,OPD,,

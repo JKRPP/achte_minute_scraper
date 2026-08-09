@@ -2,9 +2,11 @@ import pandas as pd
 import glob
 import os
 
+from paths import CACHE_DIR, OUTPUT_DIR
+
 
 def merge_csv_files_with_dedup(
-    input_folder: str = ".", dedup_column: str = "title", verify_column: str = None
+    input_folder: str = None, dedup_column: str = "title", verify_column: str = None
 ):
     """
     Merges CSV files and removes duplicate entries based on a column.
@@ -17,6 +19,9 @@ def merge_csv_files_with_dedup(
             both dedup_column and verify_column match, so a repeated topic
             with different content in verify_column is kept.
     """
+    if input_folder is None:
+        input_folder = str(CACHE_DIR)
+
     file_pattern = os.path.join(input_folder, "topics_*.csv")
     csv_files = glob.glob(file_pattern)
 
@@ -177,5 +182,5 @@ if __name__ == "__main__":
     merged_df = merge_csv_files_with_dedup(dedup_column="Thema", verify_column="Link")
     cleaned_df = clean_df(merged_df)
     print(f"Writing {len(cleaned_df)} topics to csv.")
-    cleaned_df.to_csv("topics.csv")
-    merged_df.to_csv("topics_full.csv")
+    cleaned_df.to_csv(OUTPUT_DIR / "topics.csv")
+    merged_df.to_csv(CACHE_DIR / "topics_full.csv")

@@ -6,7 +6,7 @@ services:
     ports:
       - "8085:80"
     volumes:
-      - ./:/usr/share/nginx/html:ro
+      - site:/usr/share/nginx/html:ro
     restart: unless-stopped
     networks:
       - default
@@ -17,9 +17,19 @@ services:
       context: .
       dockerfile: Dockerfile.scraper
     container_name: motion-scraper
+    environment:
+      CACHE_DIR: /app/cache
+      OUTPUT_DIR: /app/site
+    volumes:
+      - cache:/app/cache
+      - site:/app/site
     restart: unless-stopped
     networks:
       - default
+
+volumes:
+  site:
+  cache:
 
 networks:
   proxy:

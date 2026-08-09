@@ -1,4 +1,3 @@
-from pathlib import Path
 import re
 import time
 from tqdm import tqdm
@@ -8,6 +7,8 @@ from datetime import datetime
 from typing import List, Optional, Dict
 import pandas as pd
 import os
+
+from paths import ARTICLE_DIR, CACHE_DIR
 
 _http_client = httpx.Client(http2=True, headers={"User-Agent": "Mozilla/5.0"})
 
@@ -232,9 +233,12 @@ def _extract_article_body(full_soup: BeautifulSoup) -> BeautifulSoup:
 
 
 def download_article(url: str, overwrite=False):
-    fileName = "articles/" + url.removeprefix("https://www.achteminute.de/").replace(
-        "/", "_"
-    ).removesuffix("_")
+    fileName = str(
+        ARTICLE_DIR
+        / url.removeprefix("https://www.achteminute.de/")
+        .replace("/", "_")
+        .removesuffix("_")
+    )
 
     if os.path.exists(fileName) and not overwrite:
         with open(fileName, "r", encoding="utf-8") as f:
@@ -249,7 +253,7 @@ def download_article(url: str, overwrite=False):
         return []
 
     soup = _extract_article_body(BeautifulSoup(response.content, "html.parser"))
-    Path("articles/").mkdir(parents=True, exist_ok=True)
+    ARTICLE_DIR.mkdir(parents=True, exist_ok=True)
     with open(fileName, "w", encoding="utf-8") as f:
         f.write(str(soup))
         f.close()
@@ -353,7 +357,7 @@ def initial_generation(starting_year=2013, force_regenerate=False, verbose=False
 
     while current_year <= last_year:
         print(f"Getting topics from {current_year}")
-        if Path(f"topics_{current_year}.csv").exists() and not force_regenerate:
+        if (CACHE_DIR / f"topics_{current_year}.csv").exists() and not force_regenerate:
             print(
                 f"File topics_{current_year}.csv already exists. Skipping file in initial generation."
             )
@@ -373,7 +377,7 @@ def initial_generation(starting_year=2013, force_regenerate=False, verbose=False
                 )
 
         topic_df = pd.DataFrame(all_topics)
-        topic_df.to_csv(f"topics_{current_year}.csv")
+        topic_df.to_csv(CACHE_DIR / f"topics_{current_year}.csv")
         current_year += 1
 
 
