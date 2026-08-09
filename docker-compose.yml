@@ -12,6 +12,7 @@ services:
       - default
       - proxy
 
+
   scraper:
     build:
       context: .
