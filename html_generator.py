@@ -120,10 +120,8 @@ TEMPLATE = """<!doctype html>
   }}
   thead th:hover {{ color: var(--text); }}
   thead th.active {{ color: var(--accent); }}
-  th.col-datum {{ width: 6rem; }}
-  th.col-runde {{ width: 5rem; }}
-  th.col-format {{ width: 5rem; }}
-  th.col-thema {{ width: 36%; }}
+  th.col-meta {{ width: 11rem; }}
+  th.col-thema {{ width: 40%; }}
   th.col-link {{ width: 5rem; }}
   tbody td {{
     padding: .8rem 1rem;
@@ -135,13 +133,16 @@ TEMPLATE = """<!doctype html>
   }}
   tbody tr:last-child td {{ border-bottom: none; }}
   tbody tr:hover {{ background: var(--row-hover); }}
-  td.runde {{
-    white-space: nowrap;
-    font-weight: 600;
-    color: var(--accent);
+  td.meta {{ white-space: nowrap; }}
+  .meta-wrap {{
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
   }}
-  td.datum {{ white-space: nowrap; color: var(--muted); }}
-  td.format {{ white-space: nowrap; color: var(--muted); }}
+  .meta-line {{
+    color: var(--muted);
+    font-size: .8rem;
+  }}
   td.factsheet {{ color: var(--muted); }}
   a.link {{
     color: var(--muted);
@@ -167,10 +168,20 @@ TEMPLATE = """<!doctype html>
     background: var(--muted);
     color: var(--card);
   }}
+  .badge-tournament {{
+    display: block;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }}
   @media (orientation: portrait) {{
     th.col-thema, th.col-factsheet {{ width: 50%; }}
-    th.col-datum, th.col-runde, th.col-format, th.col-link,
-    td.col-datum, td.col-runde, td.col-format, td.col-link {{
+    th.col-meta, th.col-link,
+    td.col-meta, td.col-link {{
       display: none;
     }}
   }}
@@ -191,9 +202,7 @@ TEMPLATE = """<!doctype html>
     <table>
       <thead>
         <tr>
-          <th class="col-datum" data-key="Datum">Datum</th>
-          <th class="col-runde" data-key="Runde">Runde</th>
-          <th class="col-format" data-key="Format">Format</th>
+          <th class="col-meta" data-key="Datum">Datum / Infos</th>
           <th class="col-thema" data-key="Thema">Thema</th>
           <th class="col-factsheet" data-key="Factsheet">Factsheet</th>
           <th class="col-link" data-key="Link">Quelle</th>
@@ -253,7 +262,8 @@ function render() {{
     return (d.Thema ?? '').toLowerCase().includes(q)
       || (d.Factsheet ?? '').toLowerCase().includes(q)
       || (d.Runde ?? '').toLowerCase().includes(q)
-      || (d.Format ?? '').toLowerCase().includes(q);
+      || (d.Format ?? '').toLowerCase().includes(q)
+      || (d.Tournament ?? '').toLowerCase().includes(q);
   }});
 
   filtered.sort((a, b) => {{
@@ -264,9 +274,14 @@ function render() {{
 
   rowsEl.innerHTML = filtered.map(d => `
     <tr>
-      <td class="datum col-datum">${{escapeHtml(d.Datum)}}</td>
-      <td class="runde col-runde"><span class="badge">${{escapeHtml(d.Runde)}}</span></td>
-      <td class="format col-format"><span class="badge badge-format">${{escapeHtml(d.Format)}}</span></td>
+      <td class="meta col-meta">
+        <div class="meta-wrap">
+          <div class="meta-line">${{escapeHtml(d.Datum)}}</div>
+          ${{d.Tournament ? `<span class="badge badge-tournament" title="${{escapeHtml(d.Tournament)}}">${{escapeHtml(d.Tournament)}}</span>` : ''}}
+          <span class="badge">${{escapeHtml(d.Runde)}}</span>
+          <span class="badge badge-format">${{escapeHtml(d.Format)}}</span>
+        </div>
+      </td>
       <td class="thema">${{escapeHtml(d.Thema)}}</td>
       <td class="factsheet">${{escapeHtml(d.Factsheet)}}</td>
       <td class="col-link"><a class="link" href="${{escapeHtml(d.Link)}}" target="_blank" rel="noopener">Artikel &#8599;</a></td>
@@ -308,7 +323,15 @@ def generate_html(csv_path: Path, html_path: Path) -> None:
     df = df[
         [
             c
-            for c in ("Runde", "Format", "Thema", "Factsheet", "Link", "Datum")
+            for c in (
+                "Runde",
+                "Format",
+                "Thema",
+                "Factsheet",
+                "Link",
+                "Datum",
+                "Tournament",
+            )
             if c in df.columns
         ]
     ]

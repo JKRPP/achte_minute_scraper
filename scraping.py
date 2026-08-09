@@ -1,6 +1,7 @@
 from pathlib import Path
 import re
 import time
+from tqdm import tqdm
 import httpx
 from bs4 import BeautifulSoup, NavigableString
 from datetime import datetime
@@ -21,6 +22,12 @@ _DATE_IN_URL_RE = re.compile(r"/(\d{8})/")
 _ROUND_LABEL_LINE_RE = re.compile(
     r"^\(?([A-Za-zÄÖÜäöüß\-]{1,25}\s?[0-9]{0,3}):\s*(.*)$", re.DOTALL
 )
+
+_TOURNAMENT_TITLE_REPLACEMENTS = {
+    "Campus Debatte": "CD",
+    "Zeit Debatte": "ZD",
+    "Deutschsprachige Debattiermeisterschaft": "DDM",
+}
 
 
 def _get(url: str) -> httpx.Response:
@@ -224,7 +231,7 @@ def _extract_article_body(full_soup: BeautifulSoup) -> BeautifulSoup:
     return trimmed
 
 
-def _download_article(url: str, overwrite=False):
+def download_article(url: str, overwrite=False):
     fileName = "articles/" + url.removeprefix("https://www.achteminute.de/").replace(
         "/", "_"
     ).removesuffix("_")
@@ -261,7 +268,7 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
         that round, with the last one being the topic and everything before
         it forming the factsheet (see _finalize_round).
     """
-    soup = _download_article(url)
+    soup = download_article(url)
     date = extract_date_from_url(url)
 
     entries = []
@@ -291,8 +298,11 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
         if entry:
             entries.append(entry)
 
+    tournament_name = _extract_tournament_name(url)
+
     for entry in entries:
         entry["Link"] = url
+        entry["Tournament"] = tournament_name
         entry["Datum"] = date
         if "?" in entry["Thema"]:
             entry["Format"] = "OPD"
@@ -302,7 +312,40 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
     return entries
 
 
-def initial_generation(starting_year=2013, force_regenerate=False):
+def _extract_tournament_name(url: str) -> str:
+    """
+    Gets an URL and extracts the clear name of the tournament. Does not work if the tournament name is not part of the url.
+    """
+    out = url.removeprefix("https://www.achteminute.de/")
+    out = out.split("/")[1]
+    pattern_start = re.compile(
+        r"(?:gewinnt|gewinnen|siegreich)[- ](?:beim|den|die|das|dem|des|der|einen?|eine[mnrs]?|d[iea]|de[mnrs]?)?\s*(.+)$",
+        re.IGNORECASE,
+    )
+
+    match = re.search(pattern_start, out)
+    if match:
+        out = match.group(1)
+
+    out = out.replace("-", " ")
+    out = out.title()
+
+    for large_description in _TOURNAMENT_TITLE_REPLACEMENTS.keys():
+        out = out.replace(
+            large_description, _TOURNAMENT_TITLE_REPLACEMENTS[large_description]
+        )
+
+    pattern_end = re.compile(
+        r"(?:\s+(?:in|bei|am|im|vor|nach|aus|zu|vom|v\.)\s+[\w\s]+$)|(?:\s+\d{4}\s*$)|(?:\s+-\s+[\w\s]+$)",
+        re.IGNORECASE,
+    )
+
+    out = re.sub(pattern_end, "", out).strip()
+
+    return out
+
+
+def initial_generation(starting_year=2013, force_regenerate=False, verbose=False):
     first_year = starting_year
     last_year = datetime.now().year
 
@@ -320,7 +363,8 @@ def initial_generation(starting_year=2013, force_regenerate=False):
             start_year=current_year, start_month=1, end_year=current_year, end_month=12
         )
         all_topics = []
-        for link in all_links:
+        for link in tqdm(all_links):
+            all_topics.extend(extract_topics_from_article(link))
             try:
                 all_topics.extend(extract_topics_from_article(link))
             except:
@@ -334,4 +378,4 @@ def initial_generation(starting_year=2013, force_regenerate=False):
 
 
 if __name__ == "__main__":
-    initial_generation()
+    initial_generation(force_regenerate=True)

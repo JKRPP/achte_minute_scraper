@@ -75,6 +75,21 @@ def clean_df(input_df: pd.DataFrame, column_to_check="Runde") -> pd.DataFrame:
         raise ValueError(f"Column '{column_to_check}' not found in DataFrame")
 
     drop_round_vals = [
+        "Anmeldung",
+        "Auflockerung",
+        "Jurorenregelung",
+        "Methodik",
+        "Performanz",
+        "Runden",
+        "Schuppener",
+        "Teamcap",
+        "Technik",
+        "Teilnehmerbeitrag",
+        "Unterbringung",
+        "Verpflegung",
+        "Zwischenfrage",
+        "Übernachtung",
+        "Übungen",
         "ER",
         "EO",
         "SR",
