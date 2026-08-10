@@ -23,6 +23,7 @@ _DATE_IN_URL_RE = re.compile(r"/(\d{8})/")
 _ROUND_LABEL_LINE_RE = re.compile(
     r"^\(?([A-Za-zÄÖÜäöüß\-]{1,25}\s?[0-9]{0,3}):\s*(.*)$", re.DOTALL
 )
+_SECTION_HEADER_RE = re.compile(r"^[A-Za-zÀ-ÿ]+(?:\s[A-Za-zÀ-ÿ]+)+:$")
 
 _TOURNAMENT_TITLE_REPLACEMENTS = {
     "Campus Debatte": "CD",
@@ -295,6 +296,12 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
         current_content: List[str] = []
 
         for segment in _blockquote_segments(blockquote):
+            if not any(c.isalnum() for c in segment) or _SECTION_HEADER_RE.match(
+                segment
+            ):
+                # Continue on decorative splitter
+                continue
+
             label_match = _ROUND_LABEL_LINE_RE.match(segment)
             if label_match and label_match.group(1).lower().startswith(_LABEL_STEMS):
                 label_match = None
