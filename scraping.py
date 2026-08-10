@@ -75,8 +75,23 @@ def get_article_links_from_month(year: int, month: int) -> List[str]:
     article_links = []
     for a_tag in soup.find_all("a", href=True, rel="bookmark"):
         href = a_tag["href"]
-        if article_pattern.match(href) and href not in article_links:
-            article_links.append(href)
+        if not article_pattern.match(href) or href in article_links:
+            continue
+
+        # Only tournament articles ("Turniere" category) ever contain
+        # topics, and the category is already shown on the archive page
+        # itself, so we can skip downloading every other article entirely.
+        post = a_tag.find_parent("div", class_="post_archive")
+        date_div = post.find("div", class_="post_archive_date") if post else None
+        categories = (
+            {c.get_text(strip=True) for c in date_div.find_all("a", rel="category tag")}
+            if date_div
+            else set()
+        )
+        if "Turniere" not in categories:
+            continue
+
+        article_links.append(href)
 
     return article_links
 
@@ -177,29 +192,34 @@ def _strip_quotes(text: str) -> str:
 def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, str]]:
     """
     Turns a round's accumulated segments into a {Runde, Thema, Factsheet}
-    entry. The topic is always the *last* segment of the round (whatever
-    precedes it — factsheet, infoslide, bonus links, dialogue snippets — is
-    joined together as the factsheet), since that's the only positional rule
-    that holds across articles: some factsheets are explicitly labelled
-    ("Factsheet: ..."), some aren't, and some rounds have extra segments
-    (e.g. "+ ein Video: ...") wedged between the factsheet and the topic.
+    entry.
     """
     if round_label is None or not content:
         return None
 
-    topic = content[-1]
-    factsheet_parts = content[:-1]
+    topic_index = len(content) - 1
+    for i in range(len(content) - 1, -1, -1):
+        label_match = _LABEL_WORD_RE.match(content[i])
+        if label_match and label_match.group(1).lower().startswith(_LABEL_STEMS):
+            continue
+        topic_index = i
+        break
 
-    if factsheet_parts:
-        info_match = _LABEL_WORD_RE.match(factsheet_parts[0])
-        if info_match and info_match.group(1).lower().startswith(_LABEL_STEMS):
-            factsheet_parts[0] = factsheet_parts[0][info_match.end() :].strip()
+    topic = content[topic_index]
+    factsheet_parts = content[:topic_index] + content[topic_index + 1 :]
+
+    stripped_parts = []
+    for part in factsheet_parts:
+        label_match = _LABEL_WORD_RE.match(part)
+        if label_match and label_match.group(1).lower().startswith(_LABEL_STEMS):
+            part = part[label_match.end() :].strip()
+        stripped_parts.append(part)
 
     return {
         "Runde": round_label,
         "Thema": _strip_quotes(topic),
         "Factsheet": _strip_quotes(
-            " ".join(part for part in factsheet_parts if part).strip()
+            " ".join(part for part in stripped_parts if part).strip()
         ),
     }
 
@@ -207,13 +227,7 @@ def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, 
 def _extract_article_body(full_soup: BeautifulSoup) -> BeautifulSoup:
     """
     Trims a full achteminute.de page down to the article itself (title,
-    date/author/category, body, tags), dropping page chrome - global
-    styling, navigation, sidebar widgets, comments, booking forms - that
-    bloats saved files without adding any topic-relevant content.
-
-    The article lives in <div class="post">; the tag list ("Schlagworte")
-    that follows it as a sibling <small> is kept too since it's still
-    article metadata, just placed outside that div by the page markup.
+    date/author/category, body, tags).
     """
     post = full_soup.find("div", class_="post")
     if post is None:
@@ -282,6 +296,8 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
 
         for segment in _blockquote_segments(blockquote):
             label_match = _ROUND_LABEL_LINE_RE.match(segment)
+            if label_match and label_match.group(1).lower().startswith(_LABEL_STEMS):
+                label_match = None
 
             if label_match:
                 entry = _finalize_round(current_round, current_content)
@@ -368,7 +384,6 @@ def initial_generation(starting_year=2013, force_regenerate=False, verbose=False
         )
         all_topics = []
         for link in tqdm(all_links):
-            all_topics.extend(extract_topics_from_article(link))
             try:
                 all_topics.extend(extract_topics_from_article(link))
             except:

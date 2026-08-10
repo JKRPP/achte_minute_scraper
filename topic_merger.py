@@ -22,7 +22,7 @@ def merge_csv_files_with_dedup(
     if input_folder is None:
         input_folder = str(CACHE_DIR)
 
-    file_pattern = os.path.join(input_folder, "topics_*.csv")
+    file_pattern = os.path.join(input_folder, "topics_[0-9][0-9][0-9][0-9].csv")
     csv_files = glob.glob(file_pattern)
 
     if not csv_files:
@@ -169,6 +169,7 @@ def clean_df(input_df: pd.DataFrame, column_to_check="Runde") -> pd.DataFrame:
         "Wien",
         "Zweitens",
         "A",
+        "Himmelrath",
     ]
 
     old_len = len(input_df)

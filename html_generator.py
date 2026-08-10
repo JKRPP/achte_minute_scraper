@@ -308,10 +308,21 @@ function render() {{
       || normalizeForSearch(d.Tournament).includes(q);
   }});
 
+  const tieBreakKeys = ['Datum', 'Tournament', 'Runde'].filter(k => k !== sortKey);
+
   filtered.sort((a, b) => {{
     const va = (a[sortKey] ?? '').toString();
     const vb = (b[sortKey] ?? '').toString();
-    return va.localeCompare(vb, 'de') * sortDir;
+    const primary = va.localeCompare(vb, 'de') * sortDir;
+    if (primary !== 0) return primary;
+
+    for (const key of tieBreakKeys) {{
+      const ta = (a[key] ?? '').toString();
+      const tb = (b[key] ?? '').toString();
+      const cmp = ta.localeCompare(tb, 'de') * sortDir;
+      if (cmp !== 0) return cmp;
+    }}
+    return 0;
   }});
 
   rowsEl.innerHTML = filtered.map(d => `
