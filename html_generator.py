@@ -5,7 +5,9 @@ one of the topics_*.csv files produced by scraping.py.
 
 import base64
 import json
+import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -34,6 +36,28 @@ HEADER_GUY_SVG = f"""<svg class="guy" viewBox="60 55 55 105" aria-hidden="true">
   <g fill="none" stroke="currentColor" {_STROKE_ATTRS}>
 {FIGURE_PATHS}  </g>
 </svg>"""
+
+
+def _get_build_id() -> str:
+    """
+    Derives a build identifier from the current git state instead of a
+    manually-maintained counter, since that's easy to forget to bump: short
+    commit hash plus the generation timestamp.
+    """
+    repo_dir = Path(__file__).parent
+    try:
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=repo_dir,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        commit = "unknown"
+
+    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    return f"{commit} · {generated_at}"
+
 
 TEMPLATE = """<!doctype html>
 <html lang="de">
@@ -127,6 +151,14 @@ TEMPLATE = """<!doctype html>
     color: var(--muted);
     font-size: .8rem;
     margin: .5rem 0 .75rem;
+  }}
+  .build-id {{
+    color: var(--muted);
+    font-size: .7rem;
+    font-weight: 400;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    opacity: .6;
+    margin-left: auto;
   }}
   .card {{
     background: var(--card);
@@ -225,7 +257,7 @@ TEMPLATE = """<!doctype html>
 </head>
 <body>
 <header>
-  <h1>{guy}{title}</h1>
+  <h1>{guy}{title} <span class="build-id" title="Git commit + generation time">{build_id}</span></h1>
   <div class="controls">
     <input type="search" id="search" placeholder="Suche in Thema, Factsheet, Runde...">
     <select id="yearFilter"><option value="">Alle Jahre</option></select>
@@ -398,6 +430,7 @@ def generate_html(csv_path: Path, html_path: Path) -> None:
         data_json=json.dumps(records, ensure_ascii=False),
         favicon=FAVICON_DATA_URI,
         guy=HEADER_GUY_SVG,
+        build_id=_get_build_id(),
     )
     html_path.write_text(html, encoding="utf-8")
     print(f"Wrote {len(records)} rows to {html_path}")
