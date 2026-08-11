@@ -165,23 +165,29 @@ def _blockquote_segments(blockquote) -> List[str]:
     for p in blockquote.find_all("p"):
         current = ""
         br_run = 0
+        # Keeps adjacent highlighted spots together, even when a label is
+        # split across different bold-ish tags (e.g. "<b>VR</b><strong>7</strong>:").
+        current_is_strong_only = True
         for descendant in p.descendants:
             if isinstance(descendant, NavigableString):
-                current += str(descendant)
-                if str(descendant).strip():
+                text = str(descendant)
+                current += text
+                if text.strip():
                     br_run = 0
+                    if descendant.parent.name not in ("strong", "b"):
+                        current_is_strong_only = False
             elif descendant.name == "br":
                 br_run += 1
                 if br_run >= 2 and current.strip():
                     segments.append(current.strip())
                     current = ""
-            elif descendant.name == "strong":
-                # A <strong> tag always opens a new round label, even when
-                # it's embedded mid-paragraph alongside earlier content
-                # (rather than in its own <p>), so force a split here too.
-                if current.strip():
+                    current_is_strong_only = True
+            elif descendant.name in ("strong", "b"):
+                # Split on a new highlighted spot
+                if current.strip() and not current_is_strong_only:
                     segments.append(current.strip())
                     current = ""
+                    current_is_strong_only = True
                 br_run = 0
         if current.strip():
             segments.append(current.strip())
@@ -198,6 +204,94 @@ def _strip_quotes(text: str) -> str:
 def _normalize_whitespace(text: str) -> str:
     """Collapses internal whitespace (e.g. single-<br/> line wraps) to single spaces."""
     return re.sub(r"\s+", " ", text).strip()
+
+
+def _split_labelled_topic(text: str) -> tuple[str, str]:
+    """
+    Splits topics that start with "Factsheet:" or similar
+    into topic (last sentence) and factsheet (everything else)
+    """
+    if "\n" in text:
+        prefix, _, last = text.rpartition("\n")
+        if prefix.strip() and last.strip():
+            return prefix.strip(), last.strip()
+
+    # No newline to split on: fall back to the last sentence boundary
+    # (a '.', '?' or '!' followed by whitespace + a capital letter, or by
+    # end of string).
+    matches = list(re.finditer(r"[.?!]+(?=\s+[A-ZÄÖÜ]|\s*$)", text))
+    for match in reversed(matches):
+        prefix, last = text[: match.end()], text[match.end() :]
+        if prefix.strip() and last.strip():
+            return prefix.strip(), last.strip()
+
+    return "", text
+
+
+_TRAILING_LABEL_RE = re.compile(
+    r"(?<!\S)(Fact(?:sheet)?|Info(?:slide)?|Definition)\s*:", re.IGNORECASE
+)
+
+
+def _split_trailing_factsheet(text: str) -> tuple[str, str]:
+    """
+    Moves a trailing factsheet from the topic to the factsheet.
+    """
+    match = _TRAILING_LABEL_RE.search(text)
+    if not match or match.start() == 0:
+        return text, ""
+
+    topic = text[: match.start()].strip()
+    factsheet = text[match.start() :].strip()
+    if not topic or not factsheet:
+        return text, ""
+
+    return topic, factsheet
+
+
+def _split_leading_parenthetical(
+    text: str, require_label: bool = True
+) -> tuple[str, str]:
+    """
+    If there is no previous factsheet (require_label = True),
+    moves a leading parenthesis into the factsheet.
+    """
+    stripped = text.lstrip()
+    if not stripped.startswith("("):
+        return "", text
+
+    depth = 0
+    close_index = -1
+    for i, char in enumerate(stripped):
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                close_index = i
+                break
+    if close_index == -1:
+        return "", text
+
+    inner = stripped[1:close_index].strip()
+
+    if require_label:
+        # "(inkl. Factsheet)" / "(inkl. Info-Slide: ...)" style
+        # parentheticals lead with "inkl." before the actual label word.
+        inner_for_label_check = re.sub(r"^inkl\.?\s*", "", inner, flags=re.IGNORECASE)
+        inner_label_match = _LABEL_WORD_RE.match(inner_for_label_check)
+        is_factsheet_like = bool(
+            inner_label_match
+            and inner_label_match.group(1).lower().startswith(_LABEL_STEMS)
+        )
+        if not is_factsheet_like:
+            return "", text
+
+    remainder = stripped[close_index + 1 :].strip()
+    if not remainder:
+        return "", text
+
+    return inner, remainder
 
 
 def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, str]]:
@@ -223,7 +317,17 @@ def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, 
         # not the topic itself.
         stripped = content[i].strip()
         is_parenthetical_aside = stripped.startswith("(") and stripped.endswith(")")
-        if is_labeled or is_bullet_continuation or is_parenthetical_aside:
+        # A footnote trailing the topic (e.g. "*Including but not limited
+        # to: ..." or "[2] e.g of target-based regulations: ...") explains
+        # a marker (*, [1]) referenced from within an earlier segment, so
+        # it's factsheet content, never the topic itself.
+        is_footnote = bool(re.match(r"^(?:\*+|\[\d+\])", stripped))
+        if (
+            is_labeled
+            or is_bullet_continuation
+            or is_parenthetical_aside
+            or is_footnote
+        ):
             continue
         topic_index = i
         break
@@ -231,11 +335,40 @@ def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, 
     topic = content[topic_index]
     factsheet_parts = content[:topic_index] + content[topic_index + 1 :]
 
+    topic_label_match = _LABEL_WORD_RE.match(topic)
+    if topic_label_match and topic_label_match.group(1).lower().startswith(
+        _LABEL_STEMS
+    ):
+        inline_factsheet, topic = _split_labelled_topic(topic)
+        if inline_factsheet:
+            factsheet_parts.append(inline_factsheet)
+    else:
+        # The topic may come first, with a factsheet/infoslide label
+        # appearing later in the same segment (e.g. "Sollten ...?
+        # Factsheet: ...").
+        new_topic, trailing_factsheet = _split_trailing_factsheet(topic)
+        if trailing_factsheet:
+            topic = new_topic
+            factsheet_parts.append(trailing_factsheet)
+
+    # If the round has no other factsheet content, any leading parenthetical
+    # is by definition that infoslide, labelled or not.
+    leading_parenthetical, topic = _split_leading_parenthetical(
+        topic, require_label=bool(factsheet_parts)
+    )
+    if leading_parenthetical:
+        factsheet_parts.append(leading_parenthetical)
+
     stripped_parts = []
     for part in factsheet_parts:
+        part = re.sub(r"^inkl\.?\s*", "", part, flags=re.IGNORECASE)
         label_match = _LABEL_WORD_RE.match(part)
         if label_match and label_match.group(1).lower().startswith(_LABEL_STEMS):
-            part = part[label_match.end() :].strip()
+            # Cut at the label's colon rather than just the first word, so
+            # multi-word labels (e.g. "info slide:") are fully removed.
+            colon_index = part.find(":", 0, 30)
+            cut = colon_index + 1 if colon_index != -1 else label_match.end()
+            part = part[cut:].strip()
         stripped_parts.append(part)
 
     return {
