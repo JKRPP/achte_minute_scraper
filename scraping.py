@@ -201,7 +201,21 @@ def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, 
     topic_index = len(content) - 1
     for i in range(len(content) - 1, -1, -1):
         label_match = _LABEL_WORD_RE.match(content[i])
-        if label_match and label_match.group(1).lower().startswith(_LABEL_STEMS):
+        is_labeled = bool(
+            label_match and label_match.group(1).lower().startswith(_LABEL_STEMS)
+        )
+        # Bullet-style continuation lines (e.g. "– stärkere Einbeziehung ...")
+        # are always factsheet list items trailing an "Info:"/"Fact:"
+        # paragraph, never a round's topic question, so skip them too.
+        is_bullet_continuation = content[i].lstrip().startswith(
+            ("-", "–", "—", "•")
+        )
+        # A segment entirely wrapped in parentheses is a clarifying aside
+        # trailing the real topic (e.g. "(Es sei anzunehmen dass ...)"),
+        # not the topic itself.
+        stripped = content[i].strip()
+        is_parenthetical_aside = stripped.startswith("(") and stripped.endswith(")")
+        if is_labeled or is_bullet_continuation or is_parenthetical_aside:
             continue
         topic_index = i
         break
