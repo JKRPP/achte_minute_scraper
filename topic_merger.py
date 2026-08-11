@@ -1,8 +1,12 @@
+import json
 import pandas as pd
 import glob
 import os
+from pathlib import Path
 
 from paths import CACHE_DIR, OUTPUT_DIR
+
+_DATA_DIR = Path(__file__).parent / "data"
 
 
 def merge_csv_files_with_dedup(
@@ -71,7 +75,9 @@ def merge_csv_files_with_dedup(
     return merged_df
 
 
-def clean_df(input_df: pd.DataFrame, column_to_check="Runde") -> pd.DataFrame:
+def clean_df(
+    input_df: pd.DataFrame, column_to_check="Runde", standardize_rounds=True
+) -> pd.DataFrame:
     """
     Removes known 'non-topic' columns from topic dataframe
 
@@ -79,103 +85,18 @@ def clean_df(input_df: pd.DataFrame, column_to_check="Runde") -> pd.DataFrame:
     if column_to_check not in input_df.columns:
         raise ValueError(f"Column '{column_to_check}' not found in DataFrame")
 
-    drop_round_vals = [
-        "Anmeldung",
-        "Auflockerung",
-        "Jurorenregelung",
-        "Methodik",
-        "Performanz",
-        "Runden",
-        "Schuppener",
-        "Teamcap",
-        "Technik",
-        "Teilnehmerbeitrag",
-        "Unterbringung",
-        "Verpflegung",
-        "Zwischenfrage",
-        "Übernachtung",
-        "Übungen",
-        "ER",
-        "EO",
-        "SR",
-        "SO",
-        "OG",
-        "OO",
-        "CG",
-        "CO",
-        "AfD",
-        "Berlin",
-        "Chair",
-        "Chefjuroren",
-        "Dessi",
-        "AF",
-        "B",
-        "C",
-        "D",
-        "Datum",
-        "Dresden",
-        "Erstens",
-        "Factsheet",
-        "Fazit",
-        "FFR",
-        "Format",
-        "Foto",
-        "Gewinner",
-        "Göttingen",
-        "Hamburg",
-        "https",
-        "Indes",
-        "IO",
-        "Iserlohn",
-        "Jena",
-        "Juoren",
-        "Juroren",
-        "Jurorenbreak",
-        "Jury",
-        "Karlsruhe",
-        "Linke",
-        "Magdeburg",
-        "Mainz",
-        "Mannheim",
-        "Marburg",
-        "Münster",
-        "Nachher",
-        "Nachteil",
-        "Nachteile",
-        "OPP",
-        "Opp",
-        "Opposition",
-        "Oppostion",
-        "P-D-OF",
-        "Panel",
-        "PDOF",
-        "PDVF",
-        "Potsdam",
-        "Priester",
-        "Präsident",
-        "REG",
-        "Reg",
-        "Regierung",
-        "Schulz",
-        "SPD",
-        "Taschenbuchausgabe",
-        "Teambreak",
-        "Teams",
-        "Tübingen",
-        "Vorher",
-        "Vorteil",
-        "Vorteile",
-        "Wichtig",
-        "Wien",
-        "Zweitens",
-        "A",
-        "Himmelrath",
-    ]
+    with open(_DATA_DIR / "drop_round_values.json", "r", encoding="utf-8") as f:
+        drop_round_vals = json.load(f)
 
     old_len = len(input_df)
     out_df = input_df[~input_df[column_to_check].isin(drop_round_vals)].copy()
     new_len = len(out_df)
     print(f"Removed {old_len-new_len} lines according to clean list.")
+    if standardize_rounds:
+        with open(_DATA_DIR / "round_translations.json", "r", encoding="utf-8") as f:
+            translate_dict = json.load(f)
+        out_df = out_df.replace({column_to_check: translate_dict})
+        print("Standardized round descriptors")
     return out_df
 
 
