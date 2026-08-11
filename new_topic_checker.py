@@ -32,6 +32,51 @@ def check_new_articles():
     return []
 
 
+def regenerate_topics_from_cache():
+    """
+    Re-extracts topics for every previously-seen article link, using only
+    the cached HTML in ARTICLE_DIR (no network fetches for articles already
+    downloaded), then rebuilds topics.csv and index.html.
+
+    Link lists come from CACHE_DIR/{year}_links.json when available; years
+    without one (i.e. every year except the current one, which is the only
+    one check_new_articles maintains a link file for) fall back to the
+    "Link" column of that year's existing topics_{year}.csv, so historical
+    years get re-extracted too instead of only ever getting the version
+    produced by whichever extraction logic was current when they were
+    first scraped.
+    """
+    years_with_link_file = set()
+    for link_file in sorted(CACHE_DIR.glob("*_links.json")):
+        year = link_file.stem.removesuffix("_links")
+        years_with_link_file.add(year)
+        with open(link_file, "r") as f:
+            links = json.load(f)
+        _reextract_year(year, links)
+
+    for topics_file in sorted(CACHE_DIR.glob("topics_[0-9][0-9][0-9][0-9].csv")):
+        year = topics_file.stem.removeprefix("topics_")
+        if year in years_with_link_file:
+            continue
+        df = pd.read_csv(topics_file)
+        if "Link" not in df.columns:
+            continue
+        links = df["Link"].dropna().unique().tolist()
+        _reextract_year(year, links)
+
+    regenerate_site()
+
+
+def _reextract_year(year: str, links: list) -> None:
+    print(f"Re-extracting topics for {len(links)} articles from {year}...")
+    all_topics = []
+    for link in links:
+        all_topics.extend(extract_topics_from_article(link))
+
+    topic_df = pd.DataFrame(all_topics)
+    topic_df.to_csv(CACHE_DIR / f"topics_{year}.csv")
+
+
 def regenerate_site():
     """Rebuilds topics.csv and index.html from the cached per-year csvs."""
     merged_df = merge_csv_files_with_dedup(dedup_column="Thema", verify_column="Link")
