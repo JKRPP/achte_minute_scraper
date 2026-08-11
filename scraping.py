@@ -25,10 +25,15 @@ _LABEL_WORD_RE = re.compile(r"^([A-Za-zÀ-ÿ]+)\s*:?\s*")
 _LABEL_STEMS = ("info", "fact", "definition")
 _DATE_IN_URL_RE = re.compile(r"/(\d{8})/")
 _ROUND_LABEL_LINE_RE = re.compile(
-    # The colon must be followed by whitespace or end-of-string, not
-    # directly by a letter, so gender-colon notation (e.g. "Streamer:innen")
-    # in running text isn't mistaken for a round label.
-    r"^\(?((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß\-]*\s?){1,4}[0-9]{0,3}):(?!\S)\s*(.*)$",
+    # The colon must not be directly followed by a lowercase letter, so
+    # gender-colon notation (e.g. "Streamer:innen") in running text isn't
+    # mistaken for a round label. Unlike requiring trailing whitespace,
+    # this still allows a label glued directly to the next tag with no
+    # whitespace at all in the source HTML (e.g. "<strong>R5:</strong><em>Info
+    # text: ...</em>", which renders as "R5:Info text: ...").
+    # An optional "(vorbereitet)"-style annotation may sit between the
+    # label and the colon (e.g. "Runde 1 (vorbereitet): This House ...").
+    r"^\(?((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß\-]*\s?){1,4}[0-9]{0,3})(?:\s*\([^)]*\))?:(?![a-zäöüß])\s*(.*)$",
     re.DOTALL,
 )
 _SECTION_HEADER_RE = re.compile(r"^[A-Za-zÀ-ÿ]+(?:\s[A-Za-zÀ-ÿ]+)+:$")
