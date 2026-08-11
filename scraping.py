@@ -217,9 +217,7 @@ def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, 
         # Bullet-style continuation lines (e.g. "– stärkere Einbeziehung ...")
         # are always factsheet list items trailing an "Info:"/"Fact:"
         # paragraph, never a round's topic question, so skip them too.
-        is_bullet_continuation = content[i].lstrip().startswith(
-            ("-", "–", "—", "•")
-        )
+        is_bullet_continuation = content[i].lstrip().startswith(("-", "–", "—", "•"))
         # A segment entirely wrapped in parentheses is a clarifying aside
         # trailing the real topic (e.g. "(Es sei anzunehmen dass ...)"),
         # not the topic itself.
@@ -244,9 +242,7 @@ def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, 
         "Runde": round_label,
         "Thema": _normalize_whitespace(_strip_quotes(topic)),
         "Factsheet": _normalize_whitespace(
-            _strip_quotes(
-                " ".join(part for part in stripped_parts if part).strip()
-            )
+            _strip_quotes(" ".join(part for part in stripped_parts if part).strip())
         ),
     }
 
@@ -372,7 +368,7 @@ def _extract_tournament_name(url: str) -> str:
     out = url.removeprefix("https://www.achteminute.de/")
     out = out.split("/")[1]
     pattern_start = re.compile(
-        r"(?:gewinnt|gewinnen|siegreich)[- ](?:beim|den|die|das|dem|des|der|einen?|eine[mnrs]?|d[iea]|de[mnrs]?)?\s*(.+)$",
+        r"(?:gewinnt|gewinnen|siegreich|wins?)[- ](?:beim|den|die|das|dem|des|der|einen?|eine[mnrs]?|d[iea]|de[mnrs]?|the)?\s*(.+)$",
         re.IGNORECASE,
     )
 
@@ -387,6 +383,27 @@ def _extract_tournament_name(url: str) -> str:
         out = out.replace(
             large_description, _TOURNAMENT_TITLE_REPLACEMENTS[large_description]
         )
+
+    daten_und_ergebnisse_match = re.match(
+        r"^(?:Die\s+)?(.+?)\s+Daten\s+Und\s+Ergebnisse$", out, re.IGNORECASE
+    )
+    if daten_und_ergebnisse_match:
+        out = daten_und_ergebnisse_match.group(1)
+
+    break_suffix_re = re.compile(
+        r"\s+(?:Der|Die)?\s*Breaks?"
+        r"(?:\s+Und\s+Halbfinals?)?"
+        r"(?:\s+Ins\s+(?:Viertelfinale|Halbfinale|Finale|Achtelfinale))?"
+        r"(?:\s+\d+)?\s*$",
+        re.IGNORECASE,
+    )
+    out = re.sub(break_suffix_re, "", out).strip()
+
+    overview_suffix_re = re.compile(
+        r"\s+(?:Der|Die)\s+(?:Ergebnisse|U(?:e|ü)?berblick|U(?:e|ü)?bersicht)(?:\s+Des\s+.+)?\s*$",
+        re.IGNORECASE,
+    )
+    out = re.sub(overview_suffix_re, "", out).strip()
 
     pattern_end = re.compile(
         r"(?:\s+(?:in|bei|am|im|vor|nach|aus|zu|vom|v\.)\s+[\w\s]+$)|(?:\s+\d{4}\s*$)|(?:\s+-\s+[\w\s]+$)",
