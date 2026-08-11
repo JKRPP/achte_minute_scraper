@@ -21,7 +21,7 @@ _LABEL_WORD_RE = re.compile(r"^([A-Za-zÀ-ÿ]+)\s*:?\s*")
 _LABEL_STEMS = ("info", "fact", "definition")
 _DATE_IN_URL_RE = re.compile(r"/(\d{8})/")
 _ROUND_LABEL_LINE_RE = re.compile(
-    r"^\(?([A-Za-zÄÖÜäöüß\-]{1,25}\s?[0-9]{0,3}):\s*(.*)$", re.DOTALL
+    r"^\(?((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß\-]*\s?){1,4}[0-9]{0,3}):\s*(.*)$", re.DOTALL
 )
 _SECTION_HEADER_RE = re.compile(r"^[A-Za-zÀ-ÿ]+(?:\s[A-Za-zÀ-ÿ]+)+:$")
 
