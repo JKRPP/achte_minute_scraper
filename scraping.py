@@ -1,5 +1,7 @@
+import json
 import re
 import time
+from pathlib import Path
 from tqdm import tqdm
 import httpx
 from bs4 import BeautifulSoup, NavigableString
@@ -9,6 +11,8 @@ import pandas as pd
 import os
 
 from paths import ARTICLE_DIR, CACHE_DIR
+
+_DATA_DIR = Path(__file__).parent / "data"
 
 _http_client = httpx.Client(http2=True, headers={"User-Agent": "Mozilla/5.0"})
 
@@ -21,15 +25,16 @@ _LABEL_WORD_RE = re.compile(r"^([A-Za-zÀ-ÿ]+)\s*:?\s*")
 _LABEL_STEMS = ("info", "fact", "definition")
 _DATE_IN_URL_RE = re.compile(r"/(\d{8})/")
 _ROUND_LABEL_LINE_RE = re.compile(
-    r"^\(?((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß\-]*\s?){1,4}[0-9]{0,3}):\s*(.*)$", re.DOTALL
+    # The colon must be followed by whitespace or end-of-string, not
+    # directly by a letter, so gender-colon notation (e.g. "Streamer:innen")
+    # in running text isn't mistaken for a round label.
+    r"^\(?((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß\-]*\s?){1,4}[0-9]{0,3}):(?!\S)\s*(.*)$",
+    re.DOTALL,
 )
 _SECTION_HEADER_RE = re.compile(r"^[A-Za-zÀ-ÿ]+(?:\s[A-Za-zÀ-ÿ]+)+:$")
 
-_TOURNAMENT_TITLE_REPLACEMENTS = {
-    "Campus Debatte": "CD",
-    "Zeit Debatte": "ZD",
-    "Deutschsprachige Debattiermeisterschaft": "DDM",
-}
+with open(_DATA_DIR / "tournament_title_replacements.json", "r", encoding="utf-8") as f:
+    _TOURNAMENT_TITLE_REPLACEMENTS = json.load(f)
 
 
 def _get(url: str) -> httpx.Response:
@@ -190,6 +195,11 @@ def _strip_quotes(text: str) -> str:
     return text
 
 
+def _normalize_whitespace(text: str) -> str:
+    """Collapses internal whitespace (e.g. single-<br/> line wraps) to single spaces."""
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, str]]:
     """
     Turns a round's accumulated segments into a {Runde, Thema, Factsheet}
@@ -232,9 +242,11 @@ def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, 
 
     return {
         "Runde": round_label,
-        "Thema": _strip_quotes(topic),
-        "Factsheet": _strip_quotes(
-            " ".join(part for part in stripped_parts if part).strip()
+        "Thema": _normalize_whitespace(_strip_quotes(topic)),
+        "Factsheet": _normalize_whitespace(
+            _strip_quotes(
+                " ".join(part for part in stripped_parts if part).strip()
+            )
         ),
     }
 
