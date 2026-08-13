@@ -253,6 +253,61 @@ TEMPLATE = """<!doctype html>
       display: none;
     }}
   }}
+  footer {{
+    max-width: 1100px;
+    margin: 0 auto 2rem;
+    padding: 0 1.5rem;
+    text-align: center;
+  }}
+  footer button {{
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: .8rem;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0;
+    font-family: inherit;
+  }}
+  footer button:hover {{ color: var(--accent); }}
+  .modal-overlay {{
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .5);
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    z-index: 10;
+  }}
+  .modal-overlay.open {{ display: flex; }}
+  .modal {{
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    max-width: 420px;
+    width: 100%;
+    padding: 1.5rem;
+  }}
+  .modal h2 {{
+    margin: 0 0 1rem;
+    font-size: 1.1rem;
+  }}
+  .modal p {{
+    margin: 0 0 .75rem;
+    font-size: .9rem;
+    line-height: 1.5;
+  }}
+  .modal button {{
+    margin-top: .5rem;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: .5rem 1rem;
+    font-size: .85rem;
+    cursor: pointer;
+  }}
 </style>
 </head>
 <body>
@@ -281,6 +336,19 @@ TEMPLATE = """<!doctype html>
     <div class="empty" id="emptyState" style="display:none;">Keine Treffer.</div>
   </div>
 </main>
+
+<footer>
+  <button type="button" id="impressumBtn">Impressum</button>
+</footer>
+
+<div class="modal-overlay" id="impressumOverlay">
+  <div class="modal">
+    <h2>Impressum</h2>
+    <p>Jonathan Krapp<br>Scheibenstr. 4<br>52070 Aachen</p>
+    <p>Kontakt: <a class="link" href="mailto:themen@krapp.io">themen@krapp.io</a></p>
+    <button type="button" id="impressumClose">Schließen</button>
+  </div>
+</div>
 
 <script>
 const DATA = {data_json};
@@ -397,6 +465,16 @@ yearEl.addEventListener('change', render);
 formatEl.addEventListener('change', render);
 
 render();
+
+const impressumBtn = document.getElementById('impressumBtn');
+const impressumOverlay = document.getElementById('impressumOverlay');
+const impressumClose = document.getElementById('impressumClose');
+
+impressumBtn.addEventListener('click', () => impressumOverlay.classList.add('open'));
+impressumClose.addEventListener('click', () => impressumOverlay.classList.remove('open'));
+impressumOverlay.addEventListener('click', (e) => {{
+  if (e.target === impressumOverlay) impressumOverlay.classList.remove('open');
+}});
 </script>
 </body>
 </html>
