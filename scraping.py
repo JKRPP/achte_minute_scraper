@@ -491,13 +491,28 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
         entry["Link"] = url
         entry["Tournament"] = tournament_name
         entry["Datum"] = date
-        if "?" in entry["Thema"]:
-            entry["Format"] = "OPD"
-        else:
-            entry["Format"] = "BP"
+        entry["Format"] = _extract_format_from_topic(entry["Thema"])
 
     return entries
 
+def _extract_format_from_topic(topic: str) -> str:
+    """
+    Classifies a topic into either BP or OPD based on its topic string.
+    """
+    if "?" in topic:
+        return "OPD"
+
+    topic_to_match = topic.strip().replace('"', '')
+
+    bp_pattern = r'(DH|Dieses Haus|Diese Haus|This house|TH)'
+    if re.search(bp_pattern, topic_to_match, re.IGNORECASE):
+        return "BP"
+
+    opd_pattern = r'^(Sollte|Soll|Sollten|Ist)\b'
+    if re.match(opd_pattern, topic_to_match, re.IGNORECASE):
+        return "OPD"
+
+    return "unbekannt"
 
 def _extract_tournament_name(url: str) -> str:
     """
