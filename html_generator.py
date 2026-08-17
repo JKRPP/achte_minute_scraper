@@ -122,8 +122,7 @@ TEMPLATE = """<!doctype html>
   }}
   .controls {{
     display: flex;
-    gap: .75rem;
-    flex-wrap: wrap;
+    flex-direction: column;
     margin-bottom: .5rem;
   }}
   input[type="search"], select {{
@@ -141,6 +140,131 @@ TEMPLATE = """<!doctype html>
   }}
   input[type="search"]:focus, select:focus {{
     border-color: var(--accent);
+  }}
+  .search-row {{
+    display: flex;
+    gap: .75rem;
+    margin-bottom: .5rem;
+  }}
+  .filter-toggle {{
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: .55rem .9rem;
+    font-size: .9rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }}
+  .filter-toggle:hover {{ border-color: var(--accent); }}
+  .filter-toggle.active {{ border-color: var(--accent); color: var(--accent); }}
+  .filter-toggle .badge-count {{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.2rem;
+    height: 1.2rem;
+    padding: 0 .3rem;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff;
+    font-size: .7rem;
+    font-weight: 600;
+  }}
+  .filter-panel {{
+    display: none;
+    flex-wrap: wrap;
+    gap: .75rem;
+    margin-bottom: .75rem;
+    padding: .75rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }}
+  .filter-panel.open {{ display: flex; }}
+  .filter-field {{
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
+  }}
+  .filter-field label {{
+    font-size: .7rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted);
+  }}
+  .filter-field-range {{
+    min-width: 220px;
+    flex: 1;
+  }}
+  .filter-field-range label {{
+    display: flex;
+    justify-content: space-between;
+  }}
+  #yearRangeLabel {{
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 600;
+    color: var(--text);
+  }}
+  .range-slider {{
+    position: relative;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+  }}
+  .range-slider-track, .range-slider-fill {{
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 4px;
+    border-radius: 999px;
+  }}
+  .range-slider-track {{ background: var(--border); }}
+  .range-slider-fill {{ background: var(--accent); }}
+  .range-slider input[type="range"] {{
+    position: absolute;
+    left: 0;
+    right: 0;
+    width: 100%;
+    margin: 0;
+    background: none;
+    pointer-events: none;
+    appearance: none;
+    -webkit-appearance: none;
+  }}
+  .range-slider input[type="range"]::-webkit-slider-runnable-track {{
+    -webkit-appearance: none;
+    background: none;
+  }}
+  .range-slider input[type="range"]::-webkit-slider-thumb {{
+    -webkit-appearance: none;
+    pointer-events: auto;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--card);
+    box-shadow: 0 0 0 1px var(--accent);
+    cursor: pointer;
+    margin-top: 0;
+  }}
+  .range-slider input[type="range"]::-moz-range-track {{
+    background: none;
+    border: none;
+  }}
+  .range-slider input[type="range"]::-moz-range-thumb {{
+    pointer-events: auto;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--card);
+    box-shadow: 0 0 0 1px var(--accent);
+    cursor: pointer;
   }}
   main {{
     max-width: 1100px;
@@ -252,6 +376,10 @@ TEMPLATE = """<!doctype html>
     td.col-meta, td.col-link {{
       display: none;
     }}
+    .filter-field-range {{
+      max-width: none;
+      flex-basis: 100%;
+    }}
   }}
   footer {{
     max-width: 1100px;
@@ -314,9 +442,43 @@ TEMPLATE = """<!doctype html>
 <header>
   <h1>{guy}{title} <span class="build-id" title="Git commit + generation time">{build_id}</span></h1>
   <div class="controls">
-    <input type="search" id="search" placeholder="Suche in Thema, Factsheet, Runde...">
-    <select id="yearFilter"><option value="">Alle Jahre</option></select>
-    <select id="formatFilter"><option value="">Alle Formate</option></select>
+    <div class="search-row">
+      <input type="search" id="search" placeholder="Suche in Thema, Factsheet, Runde...">
+      <button type="button" class="filter-toggle" id="filterToggle">
+        Filter <span class="badge-count" id="filterCount" style="display:none;">0</span>
+      </button>
+    </div>
+    <div class="filter-panel" id="filterPanel">
+      <div class="filter-field filter-field-range">
+        <label>Zeitraum <span id="yearRangeLabel"></span></label>
+        <div class="range-slider" id="yearRangeSlider">
+          <div class="range-slider-track"></div>
+          <div class="range-slider-fill" id="yearRangeFill"></div>
+          <input type="range" id="yearFromFilter">
+          <input type="range" id="yearToFilter">
+        </div>
+      </div>
+      <div class="filter-field">
+        <label for="formatFilter">Format</label>
+        <select id="formatFilter"><option value="">Alle Formate</option></select>
+      </div>
+      <div class="filter-field">
+        <label for="infoslideFilter">Infoslide</label>
+        <select id="infoslideFilter">
+          <option value="">Alle</option>
+          <option value="mit">Mit Infoslide</option>
+          <option value="ohne">Ohne Infoslide</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="outroundFilter">Outround</label>
+        <select id="outroundFilter">
+          <option value="">Alle</option>
+          <option value="ja">Ja</option>
+          <option value="nein">Nein</option>
+        </select>
+      </div>
+    </div>
   </div>
   <div class="count" id="resultCount"></div>
 </header>
@@ -355,22 +517,50 @@ const DATA = {data_json};
 
 const rowsEl = document.getElementById('rows');
 const searchEl = document.getElementById('search');
-const yearEl = document.getElementById('yearFilter');
+const yearFromEl = document.getElementById('yearFromFilter');
+const yearToEl = document.getElementById('yearToFilter');
+const yearRangeFillEl = document.getElementById('yearRangeFill');
+const yearRangeLabelEl = document.getElementById('yearRangeLabel');
 const formatEl = document.getElementById('formatFilter');
+const infoslideEl = document.getElementById('infoslideFilter');
+const outroundEl = document.getElementById('outroundFilter');
 const countEl = document.getElementById('resultCount');
 const emptyEl = document.getElementById('emptyState');
+const filterToggle = document.getElementById('filterToggle');
+const filterPanel = document.getElementById('filterPanel');
+const filterCount = document.getElementById('filterCount');
 
 let sortKey = 'Datum';
 let sortDir = -1;
 
 const yearValues = [...new Set(DATA.map(d => (d.Datum ?? '').slice(0, 4)))]
-  .filter(Boolean).sort().reverse();
-for (const y of yearValues) {{
-  const opt = document.createElement('option');
-  opt.value = y;
-  opt.textContent = y;
-  yearEl.appendChild(opt);
+  .filter(Boolean).map(Number).sort((a, b) => a - b);
+const yearMin = yearValues[0] ?? 0;
+const yearMax = yearValues[yearValues.length - 1] ?? 0;
+for (const el of [yearFromEl, yearToEl]) {{
+  el.min = yearMin;
+  el.max = yearMax;
+  el.step = 1;
 }}
+yearFromEl.value = yearMin;
+yearToEl.value = yearMax;
+
+function updateYearRangeUi() {{
+  let from = Number(yearFromEl.value);
+  let to = Number(yearToEl.value);
+  if (from > to) {{
+    [from, to] = [to, from];
+    yearFromEl.value = from;
+    yearToEl.value = to;
+  }}
+  const span = (yearMax - yearMin) || 1;
+  const fromPct = ((from - yearMin) / span) * 100;
+  const toPct = ((to - yearMin) / span) * 100;
+  yearRangeFillEl.style.left = `${{fromPct}}%`;
+  yearRangeFillEl.style.right = `${{100 - toPct}}%`;
+  yearRangeLabelEl.textContent = from === to ? `${{from}}` : `${{from}}–${{to}}`;
+}}
+updateYearRangeUi();
 
 const formatValues = [...new Set(DATA.map(d => d.Format ?? ''))]
   .filter(Boolean).sort();
@@ -392,14 +582,45 @@ function normalizeForSearch(s) {{
     .replaceAll('ß', 'ss');
 }}
 
+const VR_ROUND_RE = /^VR\\s*\\d+$/i;
+
+function isOutround(round) {{
+  return !VR_ROUND_RE.test((round ?? '').toString().trim());
+}}
+
+function updateFilterUi() {{
+  const yearActive = Number(yearFromEl.value) !== yearMin || Number(yearToEl.value) !== yearMax;
+  const activeCount = [yearActive, formatEl.value, infoslideEl.value, outroundEl.value]
+    .filter(Boolean).length;
+  filterCount.style.display = activeCount ? 'inline-flex' : 'none';
+  filterCount.textContent = activeCount;
+  filterToggle.classList.toggle('active', activeCount > 0);
+}}
+
 function render() {{
   const q = normalizeForSearch(searchEl.value.trim());
-  const yearFilter = yearEl.value;
+  updateYearRangeUi();
+  const yearFrom = Number(yearFromEl.value);
+  const yearTo = Number(yearToEl.value);
   const formatFilter = formatEl.value;
+  const infoslideFilter = infoslideEl.value;
+  const outroundFilter = outroundEl.value;
+  updateFilterUi();
 
   let filtered = DATA.filter(d => {{
-    if (yearFilter && !(d.Datum ?? '').startsWith(yearFilter)) return false;
+    const year = Number((d.Datum ?? '').slice(0, 4));
+    if (year && (year < yearFrom || year > yearTo)) return false;
     if (formatFilter && (d.Format ?? '') !== formatFilter) return false;
+    if (outroundFilter) {{
+      const outround = isOutround(d.Runde);
+      if (outroundFilter === 'ja' && !outround) return false;
+      if (outroundFilter === 'nein' && outround) return false;
+    }}
+    if (infoslideFilter) {{
+      const hasInfoslide = (d.Factsheet ?? '').toString().trim() !== '';
+      if (infoslideFilter === 'mit' && !hasInfoslide) return false;
+      if (infoslideFilter === 'ohne' && hasInfoslide) return false;
+    }}
     if (!q) return true;
     return normalizeForSearch(d.Thema).includes(q)
       || normalizeForSearch(d.Factsheet).includes(q)
@@ -461,8 +682,12 @@ document.querySelectorAll('thead th').forEach(th => {{
 }});
 
 searchEl.addEventListener('input', render);
-yearEl.addEventListener('change', render);
+yearFromEl.addEventListener('input', render);
+yearToEl.addEventListener('input', render);
 formatEl.addEventListener('change', render);
+infoslideEl.addEventListener('change', render);
+outroundEl.addEventListener('change', render);
+filterToggle.addEventListener('click', () => filterPanel.classList.toggle('open'));
 
 render();
 
