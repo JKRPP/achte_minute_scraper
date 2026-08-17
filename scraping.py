@@ -134,15 +134,16 @@ def get_article_links_from_month(year: int, month: int) -> List[str]:
         # Only tournament articles ("Turniere" category) ever contain
         # topics, and the category is already shown on the archive page
         # itself, so we can skip downloading every other article entirely.
+        # Include articles with no categories to not silently drop articles.
         post = a_tag.find_parent("div", class_="post_archive")
         date_div = post.find("div", class_="post_archive_date") if post else None
-        categories = (
-            {c.get_text(strip=True) for c in date_div.find_all("a", rel="category tag")}
-            if date_div
-            else set()
-        )
-        if "Turniere" not in categories:
-            continue
+        if date_div is not None:
+            categories = {
+                c.get_text(strip=True)
+                for c in date_div.find_all("a", rel="category tag")
+            }
+            if "Turniere" not in categories:
+                continue
 
         article_links.append(href)
 
