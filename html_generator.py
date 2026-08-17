@@ -591,6 +591,11 @@ TEMPLATE = """<!doctype html>
     padding: 2rem 0;
     font-size: 1.1rem;
   }}
+  @keyframes random-flash {{
+    0% {{ opacity: .35; }}
+    100% {{ opacity: 1; }}
+  }}
+  #randomContent.flash {{ animation: random-flash .35s ease; }}
   .random-reveal-area {{
     margin: 1.5rem 0;
     min-height: 3rem;
@@ -1127,6 +1132,10 @@ function pickRandomMotion() {{
   randomInfoslideRevealed = false;
   randomTopicRevealed = false;
   renderRandomMotion();
+
+  randomContent.classList.remove('flash');
+  void randomContent.offsetWidth;
+  randomContent.classList.add('flash');
 }}
 
 randomBtn.addEventListener('click', () => {{
