@@ -448,7 +448,7 @@ TEMPLATE = """<!doctype html>
   thead th.active {{ color: var(--accent); }}
   th.col-meta {{ width: 11rem; }}
   th.col-thema {{ width: 40%; }}
-  th.col-link {{ width: 5rem; }}
+  th.col-link {{ width: 6rem; }}
   tbody td {{
     padding: .8rem 1rem;
     border-bottom: 1px solid var(--border);
@@ -491,8 +491,16 @@ TEMPLATE = """<!doctype html>
     color: var(--muted);
     text-decoration: none;
     font-size: .8rem;
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
   }}
   a.link:hover {{ color: var(--accent); text-decoration: underline; }}
+  .link-stack {{
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+  }}
   .empty {{
     text-align: center;
     color: var(--muted);
@@ -786,7 +794,7 @@ TEMPLATE = """<!doctype html>
           <th class="col-meta" data-key="Datum">Datum / Infos</th>
           <th class="col-thema" data-key="Thema">Thema</th>
           <th class="col-factsheet" data-key="Factsheet">Factsheet</th>
-          <th class="col-link" data-key="Link">Quelle</th>
+          <th class="col-link" data-key="Link">Links</th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
@@ -838,7 +846,7 @@ TEMPLATE = """<!doctype html>
       <div class="random-actions">
         <button type="button" id="randomCopyBtn">Motion kopieren</button>
         <button type="button" id="randomCopyLinkBtn">Link kopieren</button>
-        <button type="button" id="randomAgainBtn">Neue zufällige Motion</button>
+        <button type="button" id="randomAgainBtn">Zufällige Motion</button>
       </div>
     </div>
   </div>
@@ -934,6 +942,7 @@ function escapeHtml(s) {{
 }}
 
 const COPY_ICON_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+const LINK_ICON_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14 21 3"></path><path d="M15 3h6v6"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>';
 
 const INCLUDE_LINK_STORAGE_KEY = 'amScraperIncludeLinkInCopy';
 const includeLinkCheckbox = document.getElementById('includeLinkCheckbox');
@@ -1062,7 +1071,12 @@ function render() {{
       </td>
       <td class="thema">${{escapeHtml(d.Thema)}}<button type="button" class="copy-btn" title="Motion kopieren" aria-label="Motion kopieren">${{COPY_ICON_SVG}}</button></td>
       <td class="factsheet">${{escapeHtml(d.Factsheet)}}</td>
-      <td class="col-link"><a class="link" href="${{escapeHtml(d.Link)}}" target="_blank" rel="noopener">Artikel &#8599;</a></td>
+      <td class="col-link">
+        <div class="link-stack">
+          <a class="link" href="${{escapeHtml(buildMotionShareUrl(d))}}" target="_blank" rel="noopener">Anzeigen${{LINK_ICON_SVG}}</a>
+          <a class="link" href="${{escapeHtml(d.Link)}}" target="_blank" rel="noopener">Quelle &#8599;</a>
+        </div>
+      </td>
     </tr>
   `).join('');
 
