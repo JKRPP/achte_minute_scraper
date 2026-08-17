@@ -20,6 +20,11 @@ services:
     environment:
       CACHE_DIR: /app/cache
       OUTPUT_DIR: /app/site
+      IMPRESSUM_NAME: Max Mustermann
+      IMPRESSUM_ADDRESS: |
+        Musterstr. 123
+        67890 Musterstadt
+      IMPRESSUM_EMAIL: muster@mail.de
     volumes:
       - cache:/app/cache
       - site:/app/site

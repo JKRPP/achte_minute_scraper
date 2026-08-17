@@ -34,6 +34,10 @@ pip install -r requirements.txt
 - `data/tournament_title_replacements.json`: cleans up tournament names extracted from URLs.
 - `data/drop_round_values.json`: round labels to exclude entirely (known-bad data).
 
+## Configuration
+
+- `IMPRESSUM_NAME`, `IMPRESSUM_ADDRESS`, `IMPRESSUM_EMAIL`: contact details shown in the site's Impressum modal. `IMPRESSUM_ADDRESS` may contain newlines (rendered as line breaks). If unset, placeholder values are used. As a valid Impressum is a legal requirement in Germany, we strongly recommend setting these values correctly before deployment.
+
 ## Deployment
 
 `docker-compose.yml` runs two containers: `scraper` (this codebase, writing to a shared `cache`/`site` volume) and `web` (nginx serving the generated `site` volume as static files). Requires the `${PROXY_NETWORK}` environment variable to be set for easy integration into reverse-proxy setups.
