@@ -474,11 +474,11 @@ TEMPLATE = """<!doctype html>
         <select id="formatFilter"><option value="">Alle Formate</option></select>
       </div>
       <div class="filter-field">
-        <label for="infoslideFilter">Infoslide</label>
+        <label for="infoslideFilter">Factsheet</label>
         <select id="infoslideFilter">
           <option value="">Egal</option>
-          <option value="mit">Mit Infoslide</option>
-          <option value="ohne">Ohne Infoslide</option>
+          <option value="mit">Mit Factsheet</option>
+          <option value="ohne">Ohne Factsheet</option>
         </select>
       </div>
       <div class="filter-field">
