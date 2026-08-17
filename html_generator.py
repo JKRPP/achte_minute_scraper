@@ -4,6 +4,7 @@ one of the topics_*.csv files produced by scraping.py.
 """
 
 import base64
+import hashlib
 import html
 import json
 import os
@@ -146,6 +147,44 @@ TEMPLATE = """<!doctype html>
     font-size: .9rem;
     margin-bottom: 1.25rem;
   }}
+  .copy-link-toggle {{
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    color: var(--muted);
+    font-size: .8rem;
+    cursor: pointer;
+    user-select: none;
+    width: fit-content;
+  }}
+  .copy-link-toggle input {{
+    appearance: none;
+    -webkit-appearance: none;
+    margin: 0;
+    width: 1rem;
+    height: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--card);
+    cursor: pointer;
+    display: inline-grid;
+    place-content: center;
+  }}
+  .copy-link-toggle input::before {{
+    content: "";
+    width: .6rem;
+    height: .6rem;
+    transform: scale(0);
+    transition: transform .1s ease-in;
+    box-shadow: inset 1em 1em var(--muted);
+    clip-path: polygon(19% 31.4%, 41% 53%, 87.4% 12%, 98.4% 26%, 40% 78%, 6% 43.4%)
+  }}
+  .copy-link-toggle input:checked {{
+    border-color: var(--muted);
+  }}
+  .copy-link-toggle input:checked::before {{
+    transform: scale(1);
+  }}
   .controls {{
     display: flex;
     flex-direction: column;
@@ -216,7 +255,8 @@ TEMPLATE = """<!doctype html>
     flex-direction: column;
     gap: .3rem;
   }}
-  .filter-field label {{
+  .filter-field label,
+  .filter-field-title {{
     font-size: .7rem;
     text-transform: uppercase;
     letter-spacing: .04em;
@@ -225,6 +265,11 @@ TEMPLATE = """<!doctype html>
   .filter-field-range {{
     min-width: 220px;
     flex: 1;
+  }}
+  .filter-field-full {{
+    flex-basis: 100%;
+    padding-top: .6rem;
+    border-top: 1px solid var(--border);
   }}
   .filter-field-range label {{
     display: flex;
@@ -519,7 +564,7 @@ TEMPLATE = """<!doctype html>
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, .5);
+    background: rgba(0, 0, 0, .8);
     align-items: center;
     justify-content: center;
     padding: 1.5rem;
@@ -710,6 +755,13 @@ TEMPLATE = """<!doctype html>
           <option value="nein">Nein</option>
         </select>
       </div>
+      <div class="filter-field filter-field-full">
+        <span class="filter-field-title">Einstellungen</span>
+        <label class="copy-link-toggle">
+          <input type="checkbox" id="includeLinkCheckbox" checked>
+          Link beim kopieren von Themen mitkopieren
+        </label>
+      </div>
     </div>
   </div>
   <div class="count-row">
@@ -785,6 +837,7 @@ TEMPLATE = """<!doctype html>
       <div class="random-meta" id="randomMeta"></div>
       <div class="random-actions">
         <button type="button" id="randomCopyBtn">Motion kopieren</button>
+        <button type="button" id="randomCopyLinkBtn">Link kopieren</button>
         <button type="button" id="randomAgainBtn">Neue zufällige Motion</button>
       </div>
     </div>
@@ -882,10 +935,27 @@ function escapeHtml(s) {{
 
 const COPY_ICON_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
 
+const INCLUDE_LINK_STORAGE_KEY = 'amScraperIncludeLinkInCopy';
+const includeLinkCheckbox = document.getElementById('includeLinkCheckbox');
+includeLinkCheckbox.checked = localStorage.getItem(INCLUDE_LINK_STORAGE_KEY) !== 'false';
+includeLinkCheckbox.addEventListener('change', () => {{
+  localStorage.setItem(INCLUDE_LINK_STORAGE_KEY, includeLinkCheckbox.checked);
+}});
+
+function buildMotionShareUrl(d) {{
+  if (!d.Id) return '';
+  return `${{location.origin}}${{location.pathname}}?motion=${{encodeURIComponent(d.Id)}}`;
+}}
+
 function buildMotionText(d) {{
   const infoslide = (d.Factsheet ?? '').toString().trim();
   const thema = (d.Thema ?? '').toString().trim();
-  return (infoslide ? `Infoslide: ${{infoslide}}\n \n` : '') + `Thema: ${{thema}}`;
+  const shareUrl = includeLinkCheckbox.checked ? buildMotionShareUrl(d) : '';
+  const parts = [];
+  if (infoslide) parts.push(`Infoslide: ${{infoslide}}`);
+  parts.push(`Thema: ${{thema}}`);
+  if (shareUrl) parts.push(shareUrl);
+  return parts.join('\\n \\n');
 }}
 
 function copyMotionToClipboard(d, btnEl) {{
@@ -1088,6 +1158,7 @@ const randomTopicText = document.getElementById('randomTopicText');
 const randomMeta = document.getElementById('randomMeta');
 const randomAgainBtn = document.getElementById('randomAgainBtn');
 const randomCopyBtn = document.getElementById('randomCopyBtn');
+const randomCopyLinkBtn = document.getElementById('randomCopyLinkBtn');
 
 let randomMotion = null;
 let randomInfoslideRevealed = false;
@@ -1100,7 +1171,7 @@ function renderRandomMotion() {{
   randomContent.classList.toggle('has-infoslide', hasInfoslide);
 
   randomInfoslideBtn.style.display = hasInfoslide && !randomInfoslideRevealed ? 'inline-block' : 'none';
-  randomNoInfoslide.style.display = !hasInfoslide ? 'block' : 'none';
+  randomNoInfoslide.style.display = !hasInfoslide && !randomTopicRevealed ? 'block' : 'none';
   randomInfoslideText.style.display = hasInfoslide && randomInfoslideRevealed ? 'block' : 'none';
   randomInfoslideText.textContent = randomMotion.Factsheet ?? '';
   randomInfoslideText.classList.toggle('long-text', (randomMotion.Factsheet ?? '').toString().length > LONG_TEXT_THRESHOLD);
@@ -1167,18 +1238,58 @@ randomCopyBtn.addEventListener('click', () => {{
     setTimeout(() => {{ randomCopyBtn.textContent = original; }}, 1500);
   }});
 }});
+randomCopyLinkBtn.addEventListener('click', () => {{
+  if (!randomMotion) return;
+  navigator.clipboard.writeText(buildMotionShareUrl(randomMotion)).then(() => {{
+    const original = randomCopyLinkBtn.textContent;
+    randomCopyLinkBtn.textContent = 'Kopiert!';
+    setTimeout(() => {{ randomCopyLinkBtn.textContent = original; }}, 1500);
+  }});
+}});
+
+function openMotionById(id) {{
+  const found = DATA.find(d => d.Id === id);
+  if (!found) return false;
+  randomMotion = found;
+  randomInfoslideRevealed = false;
+  randomTopicRevealed = false;
+  randomEmpty.style.display = 'none';
+  randomContent.style.display = 'block';
+  renderRandomMotion();
+  randomOverlay.classList.add('open');
+  return true;
+}}
+
+const sharedMotionId = new URLSearchParams(location.search).get('motion');
+if (sharedMotionId) {{
+  openMotionById(sharedMotionId);
+}}
 </script>
 </body>
 </html>
 """
 
 
+def _motion_id(row: pd.Series) -> str:
+    """
+    Derives a stable id for a motion from content that uniquely identifies
+    it (article link, round, topic), so shareable deep links
+    (?motion=<id>) keep working across site regenerations instead of
+    depending on row position.
+    """
+    key = f"{row.get('Link', '')}|{row.get('Runde', '')}|{row.get('Thema', '')}"
+    return hashlib.sha1(key.encode("utf-8")).hexdigest()[:10]
+
+
 def generate_html(csv_path: Path, html_path: Path) -> None:
     df = pd.read_csv(csv_path)
+    df = df.fillna("")
+    df["Id"] = df.apply(_motion_id, axis=1)
     df = df[
         [
             c
             for c in (
+                "Id",
                 "Runde",
                 "Format",
                 "Sprache",
@@ -1191,7 +1302,6 @@ def generate_html(csv_path: Path, html_path: Path) -> None:
             if c in df.columns
         ]
     ]
-    df = df.fillna("")
 
     records = df.to_dict(orient="records")
     page_html = TEMPLATE.format(
