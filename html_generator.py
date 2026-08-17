@@ -954,7 +954,7 @@ function buildMotionText(d) {{
   const parts = [];
   if (infoslide) parts.push(`Infoslide: ${{infoslide}}`);
   parts.push(`Thema: ${{thema}}`);
-  if (shareUrl) parts.push(shareUrl);
+  if (shareUrl) parts.push(`Link: ${{shareUrl}}`);
   return parts.join('\\n \\n');
 }}
 
@@ -1205,6 +1205,7 @@ function pickRandomMotion() {{
   randomInfoslideRevealed = false;
   randomTopicRevealed = false;
   renderRandomMotion();
+  setMotionQueryParam(randomMotion.Id);
 
   if (hadNothingRevealed) {{
     randomContent.classList.remove('flash');
@@ -1213,13 +1214,32 @@ function pickRandomMotion() {{
   }}
 }}
 
+function setMotionQueryParam(id) {{
+  const url = new URL(location.href);
+  if (url.searchParams.get('motion') === id) return;
+  url.searchParams.set('motion', id);
+  history.replaceState(null, '', url.pathname + url.search + url.hash);
+}}
+
+function clearMotionQueryParam() {{
+  const url = new URL(location.href);
+  if (!url.searchParams.has('motion')) return;
+  url.searchParams.delete('motion');
+  history.replaceState(null, '', url.pathname + url.search + url.hash);
+}}
+
+function closeRandomOverlay() {{
+  randomOverlay.classList.remove('open');
+  clearMotionQueryParam();
+}}
+
 randomBtn.addEventListener('click', () => {{
   pickRandomMotion();
   randomOverlay.classList.add('open');
 }});
-randomClose.addEventListener('click', () => randomOverlay.classList.remove('open'));
+randomClose.addEventListener('click', closeRandomOverlay);
 randomOverlay.addEventListener('click', (e) => {{
-  if (e.target === randomOverlay) randomOverlay.classList.remove('open');
+  if (e.target === randomOverlay) closeRandomOverlay();
 }});
 randomInfoslideBtn.addEventListener('click', () => {{
   randomInfoslideRevealed = true;
