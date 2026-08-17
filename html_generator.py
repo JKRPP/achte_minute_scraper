@@ -16,18 +16,20 @@ import pandas as pd
 
 _IMPRESSUM_DEFAULTS = {
     "IMPRESSUM_NAME": "Max Mustermann",
-    "IMPRESSUM_ADDRESS": "Musterstraße 1\n12345 Musterstadt",
+    "IMPRESSUM_STREET": "Musterstraße 1",
+    "IMPRESSUM_CITY": "12345 Musterstadt",
     "IMPRESSUM_EMAIL": "contact@example.com",
 }
 
 
 def _get_impressum_fields() -> dict:
-    """Reads the Impressum's contact details from environment variables (with the project's own details as defaults), escaping them for HTML."""
+    """Reads the Impressum's contact details from environment variables (with placeholder defaults), escaping them for HTML."""
     name = os.environ.get("IMPRESSUM_NAME", _IMPRESSUM_DEFAULTS["IMPRESSUM_NAME"])
-    address = os.environ.get("IMPRESSUM_ADDRESS", _IMPRESSUM_DEFAULTS["IMPRESSUM_ADDRESS"])
+    street = os.environ.get("IMPRESSUM_STREET", _IMPRESSUM_DEFAULTS["IMPRESSUM_STREET"])
+    city = os.environ.get("IMPRESSUM_CITY", _IMPRESSUM_DEFAULTS["IMPRESSUM_CITY"])
     email = os.environ.get("IMPRESSUM_EMAIL", _IMPRESSUM_DEFAULTS["IMPRESSUM_EMAIL"])
 
-    address_html = "<br>".join(html.escape(line) for line in address.splitlines())
+    address_html = "<br>".join(html.escape(line) for line in (street, city) if line)
 
     return {
         "impressum_name": html.escape(name),

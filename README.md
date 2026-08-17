@@ -36,7 +36,7 @@ pip install -r requirements.txt
 
 ## Configuration
 
-- `IMPRESSUM_NAME`, `IMPRESSUM_ADDRESS`, `IMPRESSUM_EMAIL`: contact details shown in the site's Impressum modal. `IMPRESSUM_ADDRESS` may contain newlines (rendered as line breaks). If unset, placeholder values are used. As a valid Impressum is a legal requirement in Germany, we strongly recommend setting these values correctly before deployment.
+- `IMPRESSUM_NAME`, `IMPRESSUM_STREET`, `IMPRESSUM_CITY`, `IMPRESSUM_EMAIL`: contact details shown in the site's Impressum modal. If unset, placeholder values are used. As a valid Impressum is a legal requirement in Germany, we strongly recommend setting these values correctly before deployment.
 
 ## Deployment
 

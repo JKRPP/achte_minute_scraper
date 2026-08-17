@@ -21,7 +21,8 @@ services:
       CACHE_DIR: /app/cache
       OUTPUT_DIR: /app/site
       IMPRESSUM_NAME: ${IMPRESSUM_NAME}
-      IMPRESSUM_ADDRESS: ${IMPRESSUM_ADDRESS}
+      IMPRESSUM_STREET: ${IMPRESSUM_STREET}
+      IMPRESSUM_CITY: ${IMPRESSUM_CITY}
       IMPRESSUM_EMAIL: ${IMPRESSUM_EMAIL}
     volumes:
       - cache:/app/cache
