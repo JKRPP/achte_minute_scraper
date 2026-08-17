@@ -1,6 +1,6 @@
 # Achte Minute Scraper
 
-Scrapes debate motions from tournament reports on [achteminute.de](https://www.achteminute.de/) and publishes them as a searchable, filterable static web page.
+Scrapes debate motions from tournament reports on [achteminute.de](https://www.achteminute.de/) and publishes them as a searchable, filterable static web page. A "random motion" button on the site allows users to select a random motion and reveal it step by step (first Infoslide, then topic). Motions can be copied with a dedicated button.
 
 ## How it works
 
