@@ -425,6 +425,23 @@ TEMPLATE = """<!doctype html>
     font-size: .8rem;
   }}
   td.factsheet {{ color: var(--muted); }}
+  .copy-btn {{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    margin-left: .4rem;
+    background: none;
+    border: none;
+    color: var(--muted);
+    opacity: .3;
+    cursor: pointer;
+    padding: .15rem;
+    border-radius: 4px;
+    transition: opacity .15s, color .15s;
+  }}
+  tr:hover .copy-btn, .copy-btn:focus-visible {{ opacity: 1; }}
+  .copy-btn:hover {{ color: var(--accent); }}
   a.link {{
     color: var(--muted);
     text-decoration: none;
@@ -858,6 +875,22 @@ function escapeHtml(s) {{
     .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }}
 
+const COPY_ICON_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+
+function buildMotionText(d) {{
+  const infoslide = (d.Factsheet ?? '').toString().trim();
+  const thema = (d.Thema ?? '').toString().trim();
+  return (infoslide ? `Infoslide: ${{infoslide}}\n \n` : '') + `Thema: ${{thema}}`;
+}}
+
+function copyMotionToClipboard(d, btnEl) {{
+  navigator.clipboard.writeText(buildMotionText(d)).then(() => {{
+    const original = btnEl.innerHTML;
+    btnEl.innerHTML = '&#10003;';
+    setTimeout(() => {{ btnEl.innerHTML = original; }}, 1200);
+  }});
+}}
+
 function normalizeForSearch(s) {{
   return (s ?? '').toString().toLowerCase()
     .replaceAll('ä', 'ae').replaceAll('ö', 'oe').replaceAll('ü', 'ue')
@@ -952,11 +985,15 @@ function render() {{
           <span class="badge badge-format">${{escapeHtml(d.Format)}}</span>
         </div>
       </td>
-      <td class="thema">${{escapeHtml(d.Thema)}}</td>
+      <td class="thema">${{escapeHtml(d.Thema)}}<button type="button" class="copy-btn" title="Motion kopieren" aria-label="Motion kopieren">${{COPY_ICON_SVG}}</button></td>
       <td class="factsheet">${{escapeHtml(d.Factsheet)}}</td>
       <td class="col-link"><a class="link" href="${{escapeHtml(d.Link)}}" target="_blank" rel="noopener">Artikel &#8599;</a></td>
     </tr>
   `).join('');
+
+  rowsEl.querySelectorAll('.copy-btn').forEach((btn, i) => {{
+    btn.addEventListener('click', () => copyMotionToClipboard(pageItems[i], btn));
+  }});
 
   emptyEl.style.display = filtered.length ? 'none' : 'block';
   countEl.textContent = `${{filtered.length}} von ${{DATA.length}} Themen`;
@@ -1111,10 +1148,7 @@ randomTopicBtn.addEventListener('click', () => {{
 randomAgainBtn.addEventListener('click', () => pickRandomMotion());
 randomCopyBtn.addEventListener('click', () => {{
   if (!randomMotion) return;
-  const infoslide = (randomMotion.Factsheet ?? '').toString().trim();
-  const thema = (randomMotion.Thema ?? '').toString().trim();
-  const text = (infoslide ? `Infoslide: ${{infoslide}}\n \n` : '') + `Thema: ${{thema}}`;
-  navigator.clipboard.writeText(text).then(() => {{
+  navigator.clipboard.writeText(buildMotionText(randomMotion)).then(() => {{
     const original = randomCopyBtn.textContent;
     randomCopyBtn.textContent = 'Kopiert!';
     setTimeout(() => {{ randomCopyBtn.textContent = original; }}, 1500);
