@@ -100,9 +100,19 @@ def clean_df(
     return out_df
 
 
-if __name__ == "__main__":
+def build_topics_csv() -> pd.DataFrame:
+    """
+    Merges the per-year cache CSVs, cleans the result, and writes both
+    `topics.csv` (the cleaned dataset the site is built from) and
+    `topics_full.csv` (the merged-but-uncleaned cache) to disk.
+    """
     merged_df = merge_csv_files_with_dedup(dedup_column="Thema", verify_column="Link")
     cleaned_df = clean_df(merged_df)
     print(f"Writing {len(cleaned_df)} topics to csv.")
-    cleaned_df.to_csv(OUTPUT_DIR / "topics.csv", index_label="id")
-    merged_df.to_csv(CACHE_DIR / "topics_full.csv", index_label="id")
+    cleaned_df.to_csv(OUTPUT_DIR / "topics.csv", index=False)
+    merged_df.to_csv(CACHE_DIR / "topics_full.csv", index=False)
+    return cleaned_df
+
+
+if __name__ == "__main__":
+    build_topics_csv()

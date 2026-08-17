@@ -8,7 +8,6 @@ from bs4 import BeautifulSoup, NavigableString
 from datetime import datetime
 from typing import List, Optional, Dict
 import pandas as pd
-import os
 import pycld2 as cld2
 
 from paths import ARTICLE_DIR, CACHE_DIR
@@ -468,18 +467,15 @@ def _extract_article_body(full_soup: BeautifulSoup) -> BeautifulSoup:
 
 
 def download_article(url: str, overwrite=False):
-    fileName = str(
-        ARTICLE_DIR
-        / url.removeprefix("https://www.achteminute.de/")
+    file_path = ARTICLE_DIR / (
+        url.removeprefix("https://www.achteminute.de/")
         .replace("/", "_")
         .removesuffix("_")
     )
 
-    if os.path.exists(fileName) and not overwrite:
-        with open(fileName, "r", encoding="utf-8") as f:
-            html_string = f.read()
-            soup = BeautifulSoup(html_string, "html.parser")
-        return soup
+    if file_path.exists() and not overwrite:
+        html_string = file_path.read_text(encoding="utf-8")
+        return BeautifulSoup(html_string, "html.parser")
 
     try:
         response = _get(url)
@@ -489,9 +485,7 @@ def download_article(url: str, overwrite=False):
 
     soup = _extract_article_body(BeautifulSoup(response.content, "html.parser"))
     ARTICLE_DIR.mkdir(parents=True, exist_ok=True)
-    with open(fileName, "w", encoding="utf-8") as f:
-        f.write(str(soup))
-        f.close()
+    file_path.write_text(str(soup), encoding="utf-8")
 
     return soup
 
@@ -655,6 +649,22 @@ def _extract_tournament_name(url: str) -> str:
     return out
 
 
+def extract_topics_for_links(links: List[str], show_progress: bool = False) -> pd.DataFrame:
+    """
+    Extracts topics for a list of article links into a single DataFrame,
+    skipping (and logging) any article that fails to extract instead of
+    aborting the whole batch.
+    """
+    all_topics = []
+    for link in tqdm(links) if show_progress else links:
+        try:
+            all_topics.extend(extract_topics_from_article(link))
+        except Exception as e:
+            print(f"WARNING: Failed to get topics from {link}: {e!r}. Skipping article.")
+
+    return pd.DataFrame(all_topics)
+
+
 def initial_generation(starting_year=2013, force_regenerate=False, verbose=False):
     first_year = starting_year
     last_year = datetime.now().year
@@ -672,16 +682,7 @@ def initial_generation(starting_year=2013, force_regenerate=False, verbose=False
         all_links = get_all_article_links(
             start_year=current_year, start_month=1, end_year=current_year, end_month=12
         )
-        all_topics = []
-        for link in tqdm(all_links):
-            try:
-                all_topics.extend(extract_topics_from_article(link))
-            except:
-                print(
-                    f"WARNING: An exception occured while getting topics from {link}. Skipping article."
-                )
-
-        topic_df = pd.DataFrame(all_topics)
+        topic_df = extract_topics_for_links(all_links, show_progress=True)
         topic_df.to_csv(CACHE_DIR / f"topics_{current_year}.csv", index=False)
         current_year += 1
 
