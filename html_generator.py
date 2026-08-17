@@ -398,6 +398,17 @@ TEMPLATE = """<!doctype html>
     font-family: inherit;
   }}
   footer button:hover {{ color: var(--accent); }}
+  footer a.repo-link {{
+    color: var(--muted);
+    font-size: .8rem;
+    text-decoration: underline;
+  }}
+  footer a.repo-link:hover {{ color: var(--accent); }}
+  footer .footer-sep {{
+    color: var(--muted);
+    font-size: .8rem;
+    margin: 0 .5rem;
+  }}
   .modal-overlay {{
     display: none;
     position: fixed;
@@ -465,7 +476,7 @@ TEMPLATE = """<!doctype html>
       <div class="filter-field">
         <label for="infoslideFilter">Infoslide</label>
         <select id="infoslideFilter">
-          <option value="">Alle</option>
+          <option value="">Egal</option>
           <option value="mit">Mit Infoslide</option>
           <option value="ohne">Ohne Infoslide</option>
         </select>
@@ -473,7 +484,7 @@ TEMPLATE = """<!doctype html>
       <div class="filter-field">
         <label for="outroundFilter">Outround</label>
         <select id="outroundFilter">
-          <option value="">Alle</option>
+          <option value="">Egal</option>
           <option value="ja">Ja</option>
           <option value="nein">Nein</option>
         </select>
@@ -501,6 +512,8 @@ TEMPLATE = """<!doctype html>
 
 <footer>
   <button type="button" id="impressumBtn">Impressum</button>
+  <span class="footer-sep">·</span>
+  <a class="repo-link" href="https://github.com/JKRPP/achte_minute_scraper" target="_blank" rel="noopener">GitHub</a>
 </footer>
 
 <div class="modal-overlay" id="impressumOverlay">
