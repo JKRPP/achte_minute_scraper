@@ -539,6 +539,13 @@ TEMPLATE = """<!doctype html>
       max-width: none;
       flex-basis: 100%;
     }}
+    .search-row {{
+      flex-wrap: wrap;
+    }}
+    .search-row .random-trigger {{
+      flex-basis: 100%;
+      justify-content: center;
+    }}
   }}
   footer {{
     max-width: 1100px;
