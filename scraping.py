@@ -22,7 +22,7 @@ _RETRY_BACKOFF_SECONDS = 2
 _QUOTE_CHARS = "\"'„“”‚‘’«»"
 
 _LABEL_WORD_RE = re.compile(r"^([A-Za-zÀ-ÿ]+)\s*:?\s*")
-_LABEL_STEMS = ("info", "fact", "definition")
+_LABEL_STEMS = ("info", "fact", "definition", "beispiel")
 _DATE_IN_URL_RE = re.compile(r"/(\d{8})/")
 _ROUND_LABEL_LINE_RE = re.compile(
     # The colon must not be directly followed by a lowercase letter, so
@@ -37,9 +37,46 @@ _ROUND_LABEL_LINE_RE = re.compile(
     re.DOTALL,
 )
 _SECTION_HEADER_RE = re.compile(r"^[A-Za-zÀ-ÿ]+(?:\s[A-Za-zÀ-ÿ]+)+:$")
+# Markers that only ever show up in round-lineup announcements (team
+# rosters, judges), never in actual topic/factsheet content. A round whose
+# content contains one of these is a lineup blurb, not a topic, and should
+# be dropped rather than mining a person's name out of it as the "topic".
+_LINEUP_MARKER_RE = re.compile(
+    r"(?<!\S)(Regierung|Reg|Opposition|Opp|(?:Fraktionsfreie|Freie)\s+Redner|FFR)\s*:"
+    r"|(?<!\S)Es\s+jurierten\b",
+    re.IGNORECASE,
+)
 
 with open(_DATA_DIR / "tournament_title_replacements.json", "r", encoding="utf-8") as f:
     _TOURNAMENT_TITLE_REPLACEMENTS = json.load(f)
+
+with open(_DATA_DIR / "round_translations.json", "r", encoding="utf-8") as f:
+    _ROUND_TRANSLATIONS = json.load(f)
+
+# Known-legitimate round labels (both raw variants and their canonical
+# translations), used to reject look-alike "Word:" segments that aren't
+# actually round labels.
+_KNOWN_ROUND_LABELS = {k.lower() for k in _ROUND_TRANSLATIONS} | {
+    v.lower() for v in _ROUND_TRANSLATIONS.values()
+}
+# Letter-prefixes of known numbered rounds (e.g. "VR" from "VR1", "HF" from
+# "HF 1"), so numbers beyond what's literally listed (e.g. "VR12") still
+# match.
+_KNOWN_ROUND_PREFIXES = {
+    match.group(1).lower()
+    for label in _KNOWN_ROUND_LABELS
+    for match in [re.match(r"^([A-Za-zÀ-ÿ\-]+)\s*\d+$", label)]
+    if match
+}
+
+
+def _is_known_round_label(label: str) -> bool:
+    """Checks whether a matched label is a legitimate round label."""
+    normalized = re.sub(r"\s+", " ", label).strip().lower()
+    if normalized in _KNOWN_ROUND_LABELS:
+        return True
+    prefix_match = re.match(r"^([A-Za-zÀ-ÿ\-]+)\s*\d+$", normalized)
+    return bool(prefix_match and prefix_match.group(1) in _KNOWN_ROUND_PREFIXES)
 
 
 def _get(url: str) -> httpx.Response:
@@ -167,7 +204,11 @@ def _blockquote_segments(blockquote) -> List[str]:
     label per segment).
     """
     segments = []
-    for p in blockquote.find_all("p"):
+    elements = blockquote.find_all(
+        lambda tag: tag.name == "p"
+        or (tag.name == "div" and not tag.find(["p", "div"]))
+    )
+    for p in elements:
         current = ""
         br_run = 0
         # Keeps adjacent highlighted spots together, even when a label is
@@ -301,7 +342,7 @@ def _split_leading_parenthetical(
 
 def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, str]]:
     """
-    Turns a round's accumulated segments into a {Runde, Thema, Factsheet}
+    Turns a round's accumulated segments into a {Runde, Thema, Factsheet, Format}
     entry.
     """
     if round_label is None or not content:
@@ -376,12 +417,21 @@ def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, 
             part = part[cut:].strip()
         stripped_parts.append(part)
 
+    factsheet = _normalize_whitespace(
+        _strip_quotes(" ".join(part for part in stripped_parts if part).strip())
+    )
+    topic_format = _extract_format_from_topic(topic)
+
+    if topic_format == "unbekannt":
+        factsheet_format = _extract_format_from_topic(factsheet)
+        if factsheet_format != "unbekannt":
+            topic_format = factsheet_format
+            topic, factsheet = factsheet, topic
+
     return {
         "Runde": round_label,
         "Thema": _normalize_whitespace(_strip_quotes(topic)),
-        "Factsheet": _normalize_whitespace(
-            _strip_quotes(" ".join(part for part in stripped_parts if part).strip())
-        ),
+        "Factsheet": factsheet,
     }
 
 
@@ -463,13 +513,20 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
                 continue
 
             label_match = _ROUND_LABEL_LINE_RE.match(segment)
-            if label_match and label_match.group(1).lower().startswith(_LABEL_STEMS):
+            if label_match and (
+                any(
+                    word.startswith(_LABEL_STEMS)
+                    for word in label_match.group(1).lower().split()
+                )
+                or not _is_known_round_label(label_match.group(1))
+            ):
                 label_match = None
 
             if label_match:
-                entry = _finalize_round(current_round, current_content)
-                if entry:
-                    entries.append(entry)
+                if not any(_LINEUP_MARKER_RE.search(c) for c in current_content):
+                    entry = _finalize_round(current_round, current_content)
+                    if entry:
+                        entries.append(entry)
 
                 current_round = label_match.group(1).strip()
                 remainder = label_match.group(2).strip()
@@ -481,9 +538,10 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
                     continue
                 current_content.append(segment)
 
-        entry = _finalize_round(current_round, current_content)
-        if entry:
-            entries.append(entry)
+        if not any(_LINEUP_MARKER_RE.search(c) for c in current_content):
+            entry = _finalize_round(current_round, current_content)
+            if entry:
+                entries.append(entry)
 
     tournament_name = _extract_tournament_name(url)
 
@@ -495,6 +553,7 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
 
     return entries
 
+
 def _extract_format_from_topic(topic: str) -> str:
     """
     Classifies a topic into either BP or OPD based on its topic string.
@@ -502,17 +561,18 @@ def _extract_format_from_topic(topic: str) -> str:
     if "?" in topic:
         return "OPD"
 
-    topic_to_match = topic.strip().replace('"', '')
+    topic_to_match = topic.strip().replace('"', "")
 
-    bp_pattern = r'(DH|Dieses Haus|Diese Haus|This house|TH)'
+    bp_pattern = r"(DH|Dieses Haus|Diese Haus|This house|TH)"
     if re.search(bp_pattern, topic_to_match, re.IGNORECASE):
         return "BP"
 
-    opd_pattern = r'^(Sollte|Soll|Sollten|Ist)\b'
+    opd_pattern = r"^(Sollte|Soll|Sollten|Ist)\b"
     if re.match(opd_pattern, topic_to_match, re.IGNORECASE):
         return "OPD"
 
     return "unbekannt"
+
 
 def _extract_tournament_name(url: str) -> str:
     """
