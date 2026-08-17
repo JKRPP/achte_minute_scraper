@@ -474,6 +474,10 @@ TEMPLATE = """<!doctype html>
         <select id="formatFilter"><option value="">Alle Formate</option></select>
       </div>
       <div class="filter-field">
+        <label for="spracheFilter">Sprache</label>
+        <select id="spracheFilter"><option value="">Alle Sprachen</option></select>
+      </div>
+      <div class="filter-field">
         <label for="infoslideFilter">Factsheet</label>
         <select id="infoslideFilter">
           <option value="">Egal</option>
@@ -535,6 +539,7 @@ const yearToEl = document.getElementById('yearToFilter');
 const yearRangeFillEl = document.getElementById('yearRangeFill');
 const yearRangeLabelEl = document.getElementById('yearRangeLabel');
 const formatEl = document.getElementById('formatFilter');
+const spracheEl = document.getElementById('spracheFilter');
 const infoslideEl = document.getElementById('infoslideFilter');
 const outroundEl = document.getElementById('outroundFilter');
 const countEl = document.getElementById('resultCount');
@@ -584,6 +589,23 @@ for (const f of formatValues) {{
   formatEl.appendChild(opt);
 }}
 
+const SPRACHE_LABELS = {{
+  GERMAN: 'Deutsch',
+  ENGLISH: 'Englisch',
+  DUTCH: 'Niederländisch',
+  NORWEGIAN: 'Norwegisch',
+  Unknown: 'Unbekannt',
+}};
+
+const spracheValues = [...new Set(DATA.map(d => d.Sprache ?? ''))]
+  .filter(Boolean).sort();
+for (const s of spracheValues) {{
+  const opt = document.createElement('option');
+  opt.value = s;
+  opt.textContent = SPRACHE_LABELS[s] ?? s;
+  spracheEl.appendChild(opt);
+}}
+
 function escapeHtml(s) {{
   return (s ?? '').toString()
     .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
@@ -603,7 +625,7 @@ function isOutround(round) {{
 
 function updateFilterUi() {{
   const yearActive = Number(yearFromEl.value) !== yearMin || Number(yearToEl.value) !== yearMax;
-  const activeCount = [yearActive, formatEl.value, infoslideEl.value, outroundEl.value]
+  const activeCount = [yearActive, formatEl.value, spracheEl.value, infoslideEl.value, outroundEl.value]
     .filter(Boolean).length;
   filterCount.style.display = activeCount ? 'inline-flex' : 'none';
   filterCount.textContent = activeCount;
@@ -616,6 +638,7 @@ function render() {{
   const yearFrom = Number(yearFromEl.value);
   const yearTo = Number(yearToEl.value);
   const formatFilter = formatEl.value;
+  const spracheFilter = spracheEl.value;
   const infoslideFilter = infoslideEl.value;
   const outroundFilter = outroundEl.value;
   updateFilterUi();
@@ -624,6 +647,7 @@ function render() {{
     const year = Number((d.Datum ?? '').slice(0, 4));
     if (year && (year < yearFrom || year > yearTo)) return false;
     if (formatFilter && (d.Format ?? '') !== formatFilter) return false;
+    if (spracheFilter && (d.Sprache ?? '') !== spracheFilter) return false;
     if (outroundFilter) {{
       const outround = isOutround(d.Runde);
       if (outroundFilter === 'ja' && !outround) return false;
@@ -698,6 +722,7 @@ searchEl.addEventListener('input', render);
 yearFromEl.addEventListener('input', render);
 yearToEl.addEventListener('input', render);
 formatEl.addEventListener('change', render);
+spracheEl.addEventListener('change', render);
 infoslideEl.addEventListener('change', render);
 outroundEl.addEventListener('change', render);
 filterToggle.addEventListener('click', () => filterPanel.classList.toggle('open'));
@@ -727,6 +752,7 @@ def generate_html(csv_path: Path, html_path: Path) -> None:
             for c in (
                 "Runde",
                 "Format",
+                "Sprache",
                 "Thema",
                 "Factsheet",
                 "Link",

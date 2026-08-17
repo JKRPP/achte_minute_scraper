@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import List, Optional, Dict
 import pandas as pd
 import os
+import pycld2 as cld2
 
 from paths import ARTICLE_DIR, CACHE_DIR
 
@@ -46,6 +47,10 @@ _LINEUP_MARKER_RE = re.compile(
     r"|(?<!\S)Es\s+jurierten\b",
     re.IGNORECASE,
 )
+
+# Ignore control chars for cld2
+_CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
 
 with open(_DATA_DIR / "tournament_title_replacements.json", "r", encoding="utf-8") as f:
     _TOURNAMENT_TITLE_REPLACEMENTS = json.load(f)
@@ -428,10 +433,14 @@ def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, 
             topic_format = factsheet_format
             topic, factsheet = factsheet, topic
 
+    full_text = f"{factsheet} {topic}".strip()
+    language = _detect_language(full_text)
+
     return {
         "Runde": round_label,
         "Thema": _normalize_whitespace(_strip_quotes(topic)),
         "Factsheet": factsheet,
+        "Sprache": language,
     }
 
 
@@ -554,6 +563,23 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
     return entries
 
 
+def _detect_language(input: str) -> str:
+    """
+    Detects the language of a given string using Googles CLD2 model.
+    """
+    clear_german_pattern = r"(DH|Dieses Haus|begrüßt|bedauert|bereut|würde|Würde)"
+    if re.search(clear_german_pattern, input):
+        return "GERMAN"
+
+    clear_english_pattern = r"(This house|This House|regrets|supports|would|Would)"
+    if re.search(clear_english_pattern, input):
+        return "ENGLISH"
+
+    clean_input = _CONTROL_CHAR_RE.sub("", input)
+    is_reliable, text_bytes, details = cld2.detect(clean_input, hintLanguage="de")
+    return details[0][0] if details else "unknown"
+
+
 def _extract_format_from_topic(topic: str) -> str:
     """
     Classifies a topic into either BP or OPD based on its topic string.
@@ -655,7 +681,7 @@ def initial_generation(starting_year=2013, force_regenerate=False, verbose=False
                 )
 
         topic_df = pd.DataFrame(all_topics)
-        topic_df.to_csv(CACHE_DIR / f"topics_{current_year}.csv")
+        topic_df.to_csv(CACHE_DIR / f"topics_{current_year}.csv", index=False)
         current_year += 1
 
 
