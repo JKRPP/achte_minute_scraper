@@ -1128,14 +1128,18 @@ function pickRandomMotion() {{
     randomMotion = null;
     return;
   }}
+  const hadNothingRevealed = !randomInfoslideRevealed && !randomTopicRevealed;
+
   randomMotion = pool[Math.floor(Math.random() * pool.length)];
   randomInfoslideRevealed = false;
   randomTopicRevealed = false;
   renderRandomMotion();
 
-  randomContent.classList.remove('flash');
-  void randomContent.offsetWidth;
-  randomContent.classList.add('flash');
+  if (hadNothingRevealed) {{
+    randomContent.classList.remove('flash');
+    void randomContent.offsetWidth;
+    randomContent.classList.add('flash');
+  }}
 }}
 
 randomBtn.addEventListener('click', () => {{
