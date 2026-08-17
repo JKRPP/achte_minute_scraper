@@ -104,5 +104,5 @@ if __name__ == "__main__":
     merged_df = merge_csv_files_with_dedup(dedup_column="Thema", verify_column="Link")
     cleaned_df = clean_df(merged_df)
     print(f"Writing {len(cleaned_df)} topics to csv.")
-    cleaned_df.to_csv(OUTPUT_DIR / "topics.csv")
-    merged_df.to_csv(CACHE_DIR / "topics_full.csv")
+    cleaned_df.to_csv(OUTPUT_DIR / "topics.csv", index_label="id")
+    merged_df.to_csv(CACHE_DIR / "topics_full.csv", index_label="id")

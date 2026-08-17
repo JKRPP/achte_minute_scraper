@@ -74,7 +74,7 @@ def _reextract_year(year: str, links: list) -> None:
         all_topics.extend(extract_topics_from_article(link))
 
     topic_df = pd.DataFrame(all_topics)
-    topic_df.to_csv(CACHE_DIR / f"topics_{year}.csv")
+    topic_df.to_csv(CACHE_DIR / f"topics_{year}.csv", index=False)
 
 
 def regenerate_site():
@@ -82,8 +82,8 @@ def regenerate_site():
     merged_df = merge_csv_files_with_dedup(dedup_column="Thema", verify_column="Link")
     cleaned_df = clean_df(merged_df)
     print(f"Writing {len(cleaned_df)} topics to csv.")
-    cleaned_df.to_csv(OUTPUT_DIR / "topics.csv")
-    merged_df.to_csv(CACHE_DIR / "topics_full.csv")
+    cleaned_df.to_csv(OUTPUT_DIR / "topics.csv", index=False)
+    merged_df.to_csv(CACHE_DIR / "topics_full.csv", index=False)
 
     print("Generating new html")
     generate_html(OUTPUT_DIR / "topics.csv", OUTPUT_DIR / "index.html")
@@ -102,7 +102,7 @@ def check_and_regenerate():
 
         current_year = datetime.now().year
         topic_df = pd.DataFrame(all_topics)
-        topic_df.to_csv(CACHE_DIR / f"topics_{current_year}.csv")
+        topic_df.to_csv(CACHE_DIR / f"topics_{current_year}.csv", index=False)
 
         ## Write the current state of links to the json
         link_file = CACHE_DIR / f"{current_year}_links.json"
