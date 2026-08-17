@@ -562,11 +562,15 @@ def _detect_language(input: str) -> str:
     """
     Detects the language of a given string using Googles CLD2 model.
     """
-    clear_german_pattern = r"(DH|Dieses Haus|begrüßt|bedauert|bereut|würde|Würde)"
+    clear_german_pattern = (
+        r"(DH|Dieses Haus|begrüßt|bedauert|bereut|würde|Würde|Sollten)"
+    )
     if re.search(clear_german_pattern, input):
         return "GERMAN"
 
-    clear_english_pattern = r"(This house|This House|regrets|supports|would|Would)"
+    clear_english_pattern = (
+        r"(This house|This House|regrets|supports|would|Would|prefers)"
+    )
     if re.search(clear_english_pattern, input):
         return "ENGLISH"
 
@@ -649,7 +653,9 @@ def _extract_tournament_name(url: str) -> str:
     return out
 
 
-def extract_topics_for_links(links: List[str], show_progress: bool = False) -> pd.DataFrame:
+def extract_topics_for_links(
+    links: List[str], show_progress: bool = False
+) -> pd.DataFrame:
     """
     Extracts topics for a list of article links into a single DataFrame,
     skipping (and logging) any article that fails to extract instead of
@@ -660,7 +666,9 @@ def extract_topics_for_links(links: List[str], show_progress: bool = False) -> p
         try:
             all_topics.extend(extract_topics_from_article(link))
         except Exception as e:
-            print(f"WARNING: Failed to get topics from {link}: {e!r}. Skipping article.")
+            print(
+                f"WARNING: Failed to get topics from {link}: {e!r}. Skipping article."
+            )
 
     return pd.DataFrame(all_topics)
 
