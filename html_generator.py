@@ -1520,7 +1520,7 @@ def generate_html(csv_path: Path, html_path: Path) -> None:
 
     records = df.to_dict(orient="records")
     page_html = TEMPLATE.format(
-        title="Theminator",
+        title="Der Theminator",
         heading="Der Theminator: Alle Themen der Achten Minute",
         count=len(records),
         source=csv_path.name,
