@@ -5,7 +5,7 @@ from pathlib import Path
 from tqdm import tqdm
 import httpx
 from bs4 import BeautifulSoup, NavigableString
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional, Dict
 import pandas as pd
 import pycld2 as cld2
@@ -49,6 +49,11 @@ _LINEUP_MARKER_RE = re.compile(
 
 # Ignore control chars for cld2
 _CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+# WordPress category ID for "Turniere" (tournaments), resolved via
+# GET /wp-json/wp/v2/categories?search=Turniere - the only category whose
+# articles ever contain topics.
+_TURNIERE_CATEGORY_ID = 46
 
 
 with open(_DATA_DIR / "tournament_title_replacements.json", "r", encoding="utf-8") as f:
@@ -103,7 +108,9 @@ def _get(url: str) -> httpx.Response:
 
 def get_article_links_from_month(year: int, month: int) -> List[str]:
     """
-    Fetches all article links from a given month's archive page on achteminute.de.
+    Fetches all article links for a given month via the WordPress REST API,
+    filtered to the "Turniere" (tournament) category - the only one that
+    ever contains topics.
 
     Args:
         year: The year (e.g., 2026)
@@ -112,39 +119,38 @@ def get_article_links_from_month(year: int, month: int) -> List[str]:
     Returns:
         A list of full URLs to individual articles.
     """
-    url = f"https://www.achteminute.de/{year}/{month:02d}/"
-    try:
-        response = _get(url)
-    except httpx.HTTPError as e:
-        print(f"Error fetching {url}: {e}")
-        return []
-
-    soup = BeautifulSoup(response.content, "html.parser")
-    article_pattern = re.compile(
-        rf"^https://www\.achteminute\.de/{year}{month:02d}\d{{2}}/.+/$"
+    month_start = datetime(year, month, 1)
+    next_month = (
+        datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
     )
+    # Bounds are nudged by one second to prevent overlap
+    after = (month_start - timedelta(seconds=1)).isoformat()
+    before = next_month.isoformat()
 
     article_links = []
-    for a_tag in soup.find_all("a", href=True, rel="bookmark"):
-        href = a_tag["href"]
-        if not article_pattern.match(href) or href in article_links:
-            continue
+    page = 1
+    while True:
+        try:
+            response = _get(
+                "https://www.achteminute.de/wp-json/wp/v2/posts"
+                f"?categories={_TURNIERE_CATEGORY_ID}&after={after}&before={before}"
+                f"&per_page=100&page={page}&_fields=link"
+            )
+        except httpx.HTTPError as e:
+            # WP returns 400 once "page" exceeds the available page count.
+            if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 400:
+                break
+            print(f"Error fetching {year}-{month:02d} page {page}: {e}")
+            break
 
-        # Only tournament articles ("Turniere" category) ever contain
-        # topics, and the category is already shown on the archive page
-        # itself, so we can skip downloading every other article entirely.
-        # Include articles with no categories to not silently drop articles.
-        post = a_tag.find_parent("div", class_="post_archive")
-        date_div = post.find("div", class_="post_archive_date") if post else None
-        if date_div is not None:
-            categories = {
-                c.get_text(strip=True)
-                for c in date_div.find_all("a", rel="category tag")
-            }
-            if "Turniere" not in categories:
-                continue
+        posts = response.json()
+        if not posts:
+            break
 
-        article_links.append(href)
+        article_links.extend(post["link"] for post in posts)
+        if len(posts) < 100:
+            break
+        page += 1
 
     return article_links
 
