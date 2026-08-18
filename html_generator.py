@@ -114,14 +114,14 @@ TEMPLATE = """<!doctype html>
   }}
   @media (prefers-color-scheme: dark) {{
     :root {{
-      --bg: #121212;
-      --card: #1b1b1b;
+      --bg: #0f0f0f;
+      --card: #181818;
       --text: #e9e9e9;
       --muted: #a1a1a1;
-      --border: #303030;
+      --border: #2d2d2d;
       --accent: #129f33;
       --accent-weak: #1d3f25;
-      --row-hover: #222222;
+      --row-hover: #1f1f1f;
     }}
   }}
   * {{ box-sizing: border-box; }}
@@ -758,15 +758,33 @@ TEMPLATE = """<!doctype html>
     width: 100vw;
     max-height: 100vh;
     height: 100vh;
+    max-height: 100dvh;
+    height: 100dvh;
     border-radius: 0;
+    padding: var(--presentation-margin-top) var(--presentation-margin-x) var(--presentation-margin-bottom);
+  }}
+  /* #randomContent fills the modal and stacks the reveal area above the
+     (optional) action bar in normal flow, instead of overlaying it with
+     position:fixed -- that used to cover the meta badges and jitter on
+     mobile as the browser chrome resized the viewport. */
+  .random-modal.presentation-mode #randomContent {{
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }}
+  .random-modal.presentation-mode .random-reveal-stack {{
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    padding: var(--presentation-margin-top) var(--presentation-margin-x) var(--presentation-margin-bottom);
+    overflow-y: auto;
   }}
   .random-modal.presentation-mode .random-reveal-area,
   .random-modal.presentation-mode .random-meta {{
     max-width: var(--presentation-content-max-width);
+    width: 100%;
     margin-left: auto;
     margin-right: auto;
   }}
@@ -780,10 +798,7 @@ TEMPLATE = """<!doctype html>
   }}
   .random-modal.presentation-mode.controls-visible .random-actions {{
     display: block;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 1.5rem;
+    flex: none;
   }}
   .random-modal.presentation-mode.controls-visible .random-meta {{
     display: flex;
@@ -929,16 +944,18 @@ TEMPLATE = """<!doctype html>
       Keine Themen für die aktuellen Filter gefunden.
     </div>
     <div id="randomContent">
-      <div class="random-reveal-area">
-        <button type="button" class="random-reveal-btn" id="randomInfoslideBtn">Infoslide anzeigen</button>
-        <p class="random-no-infoslide" id="randomNoInfoslide" style="display:none;">Dieses Thema hat keinen Infoslide.</p>
-        <p class="random-infoslide-text" id="randomInfoslideText" style="display:none;"></p>
+      <div class="random-reveal-stack">
+        <div class="random-reveal-area">
+          <button type="button" class="random-reveal-btn" id="randomInfoslideBtn">Infoslide anzeigen</button>
+          <p class="random-no-infoslide" id="randomNoInfoslide" style="display:none;">Dieses Thema hat kein Infoslide.</p>
+          <p class="random-infoslide-text" id="randomInfoslideText" style="display:none;"></p>
+        </div>
+        <div class="random-reveal-area">
+          <button type="button" class="random-reveal-btn" id="randomTopicBtn">Thema anzeigen</button>
+          <p class="random-topic-text" id="randomTopicText" style="display:none;"></p>
+        </div>
+        <div class="random-meta" id="randomMeta"></div>
       </div>
-      <div class="random-reveal-area">
-        <button type="button" class="random-reveal-btn" id="randomTopicBtn">Thema anzeigen</button>
-        <p class="random-topic-text" id="randomTopicText" style="display:none;"></p>
-      </div>
-      <div class="random-meta" id="randomMeta"></div>
       <div class="random-actions">
         <button type="button" id="randomCopyBtn">Motion kopieren</button>
         <button type="button" id="randomCopyLinkBtn">Link kopieren</button>
@@ -1296,7 +1313,8 @@ const randomMeta = document.getElementById('randomMeta');
 const randomAgainBtn = document.getElementById('randomAgainBtn');
 const randomCopyBtn = document.getElementById('randomCopyBtn');
 const randomCopyLinkBtn = document.getElementById('randomCopyLinkBtn');
-const randomActions = document.querySelector('.random-actions');
+const randomRevealStack = document.querySelector('.random-reveal-stack');
+const randomActionsEl = document.querySelector('.random-actions');
 
 let randomMotion = null;
 let randomInfoslideRevealed = false;
@@ -1347,10 +1365,15 @@ function fitPresentationText() {{
   const baseTopicSize = parseFloat(getComputedStyle(randomTopicText).fontSize) || 0;
   const baseTopicLineHeight = parseFloat(getComputedStyle(randomTopicText).lineHeight) || baseTopicSize * 1.25;
   const modalStyle = getComputedStyle(randomModal);
-  const actionsReserve = randomTopicRevealed ? randomActions.offsetHeight + 24 : 0;
+  const actionsReserve = randomTopicRevealed
+    ? randomActionsEl.offsetHeight + (parseFloat(getComputedStyle(randomActionsEl).marginTop) || 0)
+    : 0;
   const topicSpaceReserve = randomInfoslideRevealed && !randomTopicRevealed
     ? baseTopicLineHeight * 4 - randomTopicBtn.offsetHeight
     : 0;
+  // #randomContent is a fixed-height flex column in presentation mode, so its
+  // own scrollHeight just reflects that fixed height -- measure the reveal
+  // stack (the part that actually grows with the font size) instead.
   const availableHeight = randomModal.clientHeight
     - (parseFloat(modalStyle.paddingTop) || 0)
     - (parseFloat(modalStyle.paddingBottom) || 0)
@@ -1360,7 +1383,7 @@ function fitPresentationText() {{
   const fits = (scale) => {{
     if (randomInfoslideRevealed) randomInfoslideText.style.fontSize = `${{baseInfoSize * scale}}px`;
     if (randomTopicRevealed) randomTopicText.style.fontSize = `${{baseTopicSize * scale}}px`;
-    return randomContent.scrollHeight <= availableHeight;
+    return randomRevealStack.scrollHeight <= availableHeight;
   }};
 
   let lo, hi;
