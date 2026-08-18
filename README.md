@@ -4,7 +4,7 @@ Scrapes debate motions from tournament reports on [achteminute.de](https://www.a
 
 ## How it works
 
-1. **Discovery** (`scraping.get_article_links_from_month`) walks achteminute.de's monthly archive pages and collects links to articles tagged "Turniere". (Important: If articles are not tagged correctly, they won't be discovered. Motions from Discussion articles will not be included.)
+1. **Discovery** (`scraping.get_all_article_links`) queries achteminute.de's WordPress REST API for posts in the "Turniere" (tournament) category over a given date range. (Important: If articles are not tagged correctly, they won't be discovered. Motions from Discussion articles will not be included.)
 2. **Extraction** (`scraping.extract_topics_from_article`) downloads the discovered articles into the `articles/` folder and parses the `<blockquote>` block containing the round-by-round motions, and pulls out round label, topic, factsheet/infoslide, format (BP/OPD) and detected language for every round.
 3. **Merging and cleanup** (`topic_merger.py`) combines the per-year CSVs, deduplicates, drops known-bad rows and normalizes round labels (e.g. `R1` → `VR1`) via `data/round_translations.json`.
 4. **Site generation** (`html_generator.py`) renders the merged CSV into a single self-contained `index.html` (search, year-range/format/language/infoslide/outround filters, sortable table).

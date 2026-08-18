@@ -106,26 +106,44 @@ def _get(url: str) -> httpx.Response:
             time.sleep(_RETRY_BACKOFF_SECONDS * attempt)
 
 
-def get_article_links_from_month(year: int, month: int) -> List[str]:
+def get_all_article_links(
+    start_year: int = 2026,
+    start_month: int = 1,
+    end_year: Optional[int] = None,
+    end_month: Optional[int] = None,
+) -> List[str]:
     """
-    Fetches all article links for a given month via the WordPress REST API,
-    filtered to the "Turniere" (tournament) category - the only one that
-    ever contains topics.
+    Fetches all article links published in the given date range via the
+    WordPress REST API, filtered to the "Turniere" (tournament) category.
 
     Args:
-        year: The year (e.g., 2026)
-        month: The month (e.g., 7 for July)
+        start_year: The year to start from (default: 2026).
+        start_month: The month to start from (default: 1 for January).
+        end_year: The year to end at (inclusive). If None, uses the current month.
+        end_month: The month to end at (inclusive). If None, uses the current month.
 
     Returns:
-        A list of full URLs to individual articles.
+        A combined list of all article URLs from the specified range.
     """
-    month_start = datetime(year, month, 1)
-    next_month = (
-        datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
+    if end_year is None or end_month is None:
+        today = datetime.now()
+        end_year = today.year
+        end_month = today.month
+
+    start_date = datetime(start_year, start_month, 1)
+    end_date = (
+        datetime(end_year + 1, 1, 1)
+        if end_month == 12
+        else datetime(end_year, end_month + 1, 1)
     )
-    # Bounds are nudged by one second to prevent overlap
-    after = (month_start - timedelta(seconds=1)).isoformat()
-    before = next_month.isoformat()
+    # Bounds are exclusive, nudged by one second to prevent overlap.
+    after = (start_date - timedelta(seconds=1)).isoformat()
+    before = end_date.isoformat()
+
+    print(
+        f"Fetching tournament article links from {start_date:%B %Y} "
+        f"to {datetime(end_year, end_month, 1):%B %Y}..."
+    )
 
     article_links = []
     page = 1
@@ -140,7 +158,7 @@ def get_article_links_from_month(year: int, month: int) -> List[str]:
             # WP returns 400 once "page" exceeds the available page count.
             if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 400:
                 break
-            print(f"Error fetching {year}-{month:02d} page {page}: {e}")
+            print(f"Error fetching article links (page {page}): {e}")
             break
 
         posts = response.json()
@@ -153,49 +171,6 @@ def get_article_links_from_month(year: int, month: int) -> List[str]:
         page += 1
 
     return article_links
-
-
-def get_all_article_links(
-    start_year: int = 2026,
-    start_month: int = 1,
-    end_year: Optional[int] = None,
-    end_month: Optional[int] = None,
-) -> List[str]:
-    """
-    Iterates through a range of months and collects all article links.
-
-    Args:
-        start_year: The year to start from (default: 2026).
-        start_month: The month to start from (default: 1 for January).
-        end_year: The year to end at (inclusive). If None, uses the current month.
-        end_month: The month to end at (inclusive). If None, uses the current month.
-
-    Returns:
-        A combined list of all article URLs from the specified range.
-    """
-    all_links = []
-
-    if end_year is None or end_month is None:
-        today = datetime.now()
-        end_year = today.year
-        end_month = today.month
-
-    current_date = datetime(start_year, start_month, 1)
-    end_date = datetime(end_year, end_month, 1)
-
-    while current_date <= end_date:
-        print(f"Fetching links for {current_date.strftime('%B %Y')}...")
-        month_links = get_article_links_from_month(
-            current_date.year, current_date.month
-        )
-        all_links.extend(month_links)
-
-        if current_date.month == 12:
-            current_date = datetime(current_date.year + 1, 1, 1)
-        else:
-            current_date = datetime(current_date.year, current_date.month + 1, 1)
-
-    return all_links
 
 
 def extract_date_from_url(url: str) -> Optional[str]:
