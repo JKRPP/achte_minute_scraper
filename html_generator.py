@@ -15,6 +15,11 @@ from pathlib import Path
 
 import pandas as pd
 
+## Single source of truth for the fixed brand color, also mirrored as the
+## --brand CSS variable in TEMPLATE so the favicon and header logo can never
+## drift out of sync with each other.
+BRAND_COLOR = "#6366f1"
+
 _IMPRESSUM_DEFAULTS = {
     "IMPRESSUM_NAME": "Max Mustermann",
     "IMPRESSUM_STREET": "Musterstraße 1",
@@ -49,7 +54,7 @@ _STROKE_ATTRS = 'stroke-width="3.4" stroke-linecap="round" stroke-linejoin="roun
 
 ## Favicon: figure in white on the rounded indigo tile.
 FAVICON_SVG = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="25 55 120 120">
-  <rect x="25" y="55" width="120" height="120" rx="22" fill="#6366f1"/>
+  <rect x="25" y="55" width="120" height="120" rx="22" fill="{BRAND_COLOR}"/>
   <g fill="none" stroke="#ffffff" {_STROKE_ATTRS}>
 {FIGURE_PATHS}  </g>
 </svg>
@@ -103,6 +108,9 @@ TEMPLATE = """<!doctype html>
     --accent: #6366f1;
     --accent-weak: #eef0fe;
     --row-hover: #f3f4f6;
+    --brand: {brand_color};
+    --on-accent: #ffffff;
+    --overlay-backdrop: rgba(0, 0, 0, .8);
   }}
   @media (prefers-color-scheme: dark) {{
     :root {{
@@ -140,7 +148,7 @@ TEMPLATE = """<!doctype html>
     height: 1.9em;
     width: auto;
     flex: none;
-    color: #6366f1;
+    color: var(--brand);
   }}
   .subtitle {{
     color: var(--muted);
@@ -235,7 +243,7 @@ TEMPLATE = """<!doctype html>
     padding: 0 .3rem;
     border-radius: 999px;
     background: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
     font-size: .7rem;
     font-weight: 600;
   }}
@@ -270,6 +278,23 @@ TEMPLATE = """<!doctype html>
     flex-basis: 100%;
     padding-top: .6rem;
     border-top: 1px solid var(--border);
+  }}
+  .settings-groups {{
+    display: flex;
+    gap: 4rem;
+    flex-wrap: wrap;
+    margin-top: .5rem;
+  }}
+  .settings-group {{
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+  }}
+  .settings-group-title {{
+    font-size: .7rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted);
   }}
   .filter-field-range label {{
     display: flex;
@@ -579,7 +604,7 @@ TEMPLATE = """<!doctype html>
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, .8);
+    background: var(--overlay-backdrop);
     align-items: center;
     justify-content: center;
     padding: 1.5rem;
@@ -606,7 +631,7 @@ TEMPLATE = """<!doctype html>
   .modal button {{
     margin-top: .5rem;
     background: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
     border: none;
     border-radius: 8px;
     padding: .5rem 1rem;
@@ -615,12 +640,12 @@ TEMPLATE = """<!doctype html>
   }}
   .random-trigger {{
     background: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
     border-color: var(--accent);
   }}
   .random-trigger:hover {{
     border-color: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
     opacity: .9;
   }}
   .random-modal {{
@@ -663,7 +688,7 @@ TEMPLATE = """<!doctype html>
   }}
   .random-reveal-btn {{
     background: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
     border: none;
     border-radius: 10px;
     padding: 1rem 1.75rem;
@@ -723,6 +748,46 @@ TEMPLATE = """<!doctype html>
     cursor: pointer;
   }}
   .random-actions button:hover {{ border-color: var(--accent); color: var(--accent); }}
+  .modal-overlay.presentation-mode {{ padding: 0; background: var(--bg, #000); }}
+  .random-modal.presentation-mode {{
+    --presentation-margin-top: 3rem;
+    --presentation-margin-bottom: 3rem;
+    --presentation-margin-x: 1.5rem;
+    --presentation-content-max-width: 80rem;
+    max-width: 100vw;
+    width: 100vw;
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: var(--presentation-margin-top) var(--presentation-margin-x) var(--presentation-margin-bottom);
+  }}
+  .random-modal.presentation-mode .random-reveal-area,
+  .random-modal.presentation-mode .random-meta {{
+    max-width: var(--presentation-content-max-width);
+    margin-left: auto;
+    margin-right: auto;
+  }}
+  .random-modal.presentation-mode .modal-close,
+  .random-modal.presentation-mode .random-actions,
+  .random-modal.presentation-mode .random-meta {{
+    display: none;
+  }}
+  .random-modal.presentation-mode.controls-visible .modal-close {{
+    display: block;
+  }}
+  .random-modal.presentation-mode.controls-visible .random-actions {{
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 1.5rem;
+  }}
+  .random-modal.presentation-mode.controls-visible .random-meta {{
+    display: flex;
+  }}
 </style>
 </head>
 <body>
@@ -772,10 +837,34 @@ TEMPLATE = """<!doctype html>
       </div>
       <div class="filter-field filter-field-full">
         <span class="filter-field-title">Einstellungen</span>
-        <label class="copy-link-toggle">
-          <input type="checkbox" id="includeLinkCheckbox" checked>
-          Link beim kopieren von Themen mitkopieren
-        </label>
+        <div class="settings-groups">
+          <div class="settings-group">
+            <span class="settings-group-title">Kopieren</span>
+            <label class="copy-link-toggle">
+              <input type="radio" name="copyMode" id="copyModeAll" value="all" checked>
+              Motion, Infoslide und Link
+            </label>
+            <label class="copy-link-toggle">
+              <input type="radio" name="copyMode" id="copyModeContent" value="content">
+              Nur Motion und Infoslide
+            </label>
+            <label class="copy-link-toggle">
+              <input type="radio" name="copyMode" id="copyModeLink" value="link">
+              Nur Link
+            </label>
+          </div>
+          <div class="settings-group">
+            <span class="settings-group-title">Präsentieren</span>
+            <label class="copy-link-toggle">
+              <input type="radio" name="tabMode" id="tabModeNew" value="new" checked>
+              Neuer Tab
+            </label>
+            <label class="copy-link-toggle">
+              <input type="radio" name="tabMode" id="tabModeSame" value="same">
+              Selber Tab
+            </label>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -834,7 +923,7 @@ TEMPLATE = """<!doctype html>
 </div>
 
 <div class="modal-overlay" id="randomOverlay">
-  <div class="modal random-modal">
+  <div class="modal random-modal" id="randomModal">
     <button type="button" class="modal-close" id="randomClose" aria-label="Schließen">&times;</button>
     <div class="random-empty" id="randomEmpty" style="display:none;">
       Keine Themen für die aktuellen Filter gefunden.
@@ -951,26 +1040,52 @@ function escapeHtml(s) {{
 const COPY_ICON_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
 const LINK_ICON_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14 21 3"></path><path d="M15 3h6v6"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>';
 
-const INCLUDE_LINK_STORAGE_KEY = 'amScraperIncludeLinkInCopy';
-const includeLinkCheckbox = document.getElementById('includeLinkCheckbox');
-includeLinkCheckbox.checked = localStorage.getItem(INCLUDE_LINK_STORAGE_KEY) !== 'false';
-includeLinkCheckbox.addEventListener('change', () => {{
-  localStorage.setItem(INCLUDE_LINK_STORAGE_KEY, includeLinkCheckbox.checked);
-}});
+const COPY_MODE_STORAGE_KEY = 'amScraperCopyMode';
+const copyModeRadios = document.querySelectorAll('input[name="copyMode"]');
+const storedCopyMode = localStorage.getItem(COPY_MODE_STORAGE_KEY) ?? 'all';
+for (const radio of copyModeRadios) {{
+  radio.checked = radio.value === storedCopyMode;
+  radio.addEventListener('change', () => {{
+    if (radio.checked) localStorage.setItem(COPY_MODE_STORAGE_KEY, radio.value);
+  }});
+}}
+function getCopyMode() {{
+  return document.querySelector('input[name="copyMode"]:checked')?.value ?? 'all';
+}}
+
+const TAB_MODE_STORAGE_KEY = 'amScraperTabMode';
+const tabModeRadios = document.querySelectorAll('input[name="tabMode"]');
+const storedTabMode = localStorage.getItem(TAB_MODE_STORAGE_KEY) ?? 'new';
+for (const radio of tabModeRadios) {{
+  radio.checked = radio.value === storedTabMode;
+  radio.addEventListener('change', () => {{
+    if (radio.checked) {{
+      localStorage.setItem(TAB_MODE_STORAGE_KEY, radio.value);
+      render();
+    }}
+  }});
+}}
+function isSameTabMode() {{
+  return (document.querySelector('input[name="tabMode"]:checked')?.value ?? 'new') === 'same';
+}}
 
 function buildMotionShareUrl(d) {{
   if (!d.Id) return '';
-  return `${{location.origin}}${{location.pathname}}?motion=${{encodeURIComponent(d.Id)}}`;
+  const base = location.href.split('#')[0].split('?')[0];
+  return `${{base}}?motion=${{encodeURIComponent(d.Id)}}`;
 }}
 
 function buildMotionText(d) {{
+  const mode = getCopyMode();
+  const shareUrl = buildMotionShareUrl(d);
+  if (mode === 'link') return shareUrl;
+
   const infoslide = (d.Factsheet ?? '').toString().trim();
   const thema = (d.Thema ?? '').toString().trim();
-  const shareUrl = includeLinkCheckbox.checked ? buildMotionShareUrl(d) : '';
   const parts = [];
   if (infoslide) parts.push(`Infoslide: ${{infoslide}}`);
   parts.push(`Thema: ${{thema}}`);
-  if (shareUrl) parts.push(`Link: ${{shareUrl}}`);
+  if (mode === 'all' && shareUrl) parts.push(`Link: ${{shareUrl}}`);
   return parts.join('\\n \\n');
 }}
 
@@ -1080,7 +1195,7 @@ function render() {{
       <td class="factsheet">${{escapeHtml(d.Factsheet)}}</td>
       <td class="col-link">
         <div class="link-stack">
-          <a class="link" href="${{escapeHtml(buildMotionShareUrl(d))}}" target="_blank" rel="noopener">Anzeigen${{LINK_ICON_SVG}}</a>
+          <a class="link" href="${{escapeHtml(buildMotionShareUrl(d))}}"${{isSameTabMode() ? '' : ' target="_blank" rel="noopener"'}}>Anzeigen${{LINK_ICON_SVG}}</a>
           <a class="link" href="${{escapeHtml(d.Link)}}" target="_blank" rel="noopener">Quelle &#8599;</a>
         </div>
       </td>
@@ -1168,6 +1283,7 @@ impressumOverlay.addEventListener('click', (e) => {{
 
 const randomBtn = document.getElementById('randomBtn');
 const randomOverlay = document.getElementById('randomOverlay');
+const randomModal = document.getElementById('randomModal');
 const randomClose = document.getElementById('randomClose');
 const randomEmpty = document.getElementById('randomEmpty');
 const randomContent = document.getElementById('randomContent');
@@ -1180,13 +1296,18 @@ const randomMeta = document.getElementById('randomMeta');
 const randomAgainBtn = document.getElementById('randomAgainBtn');
 const randomCopyBtn = document.getElementById('randomCopyBtn');
 const randomCopyLinkBtn = document.getElementById('randomCopyLinkBtn');
+const randomActions = document.querySelector('.random-actions');
 
 let randomMotion = null;
 let randomInfoslideRevealed = false;
 let randomTopicRevealed = false;
+let presentationMode = false;
 
 function renderRandomMotion() {{
   if (!randomMotion) return;
+
+  randomModal.classList.toggle('presentation-mode', presentationMode);
+  randomModal.classList.toggle('controls-visible', !presentationMode || randomTopicRevealed);
 
   const hasInfoslide = (randomMotion.Factsheet ?? '').toString().trim() !== '';
   randomContent.classList.toggle('has-infoslide', hasInfoslide);
@@ -1210,6 +1331,49 @@ function renderRandomMotion() {{
     <span>${{escapeHtml(randomMotion.Datum)}}</span>
     ${{randomMotion.Link ? `<a class="link" href="${{escapeHtml(randomMotion.Link)}}" target="_blank" rel="noopener">Artikel &#8599;</a>` : ''}}
   ` : '';
+
+  fitPresentationText();
+}}
+
+function fitPresentationText() {{
+  randomInfoslideText.style.fontSize = '';
+  randomTopicText.style.fontSize = '';
+  if (!presentationMode || !randomMotion) return;
+  if (!randomInfoslideRevealed && !randomTopicRevealed) return;
+
+  const baseInfoSize = parseFloat(getComputedStyle(randomInfoslideText).fontSize) || 0;
+  const baseTopicSize = parseFloat(getComputedStyle(randomTopicText).fontSize) || 0;
+  const baseTopicLineHeight = parseFloat(getComputedStyle(randomTopicText).lineHeight) || baseTopicSize * 1.25;
+  const modalStyle = getComputedStyle(randomModal);
+  const actionsReserve = randomTopicRevealed ? randomActions.offsetHeight + 24 : 0;
+  const topicSpaceReserve = randomInfoslideRevealed && !randomTopicRevealed
+    ? baseTopicLineHeight * 4 - randomTopicBtn.offsetHeight
+    : 0;
+  const availableHeight = randomModal.clientHeight
+    - (parseFloat(modalStyle.paddingTop) || 0)
+    - (parseFloat(modalStyle.paddingBottom) || 0)
+    - actionsReserve
+    - Math.max(0, topicSpaceReserve);
+
+  const fits = (scale) => {{
+    if (randomInfoslideRevealed) randomInfoslideText.style.fontSize = `${{baseInfoSize * scale}}px`;
+    if (randomTopicRevealed) randomTopicText.style.fontSize = `${{baseTopicSize * scale}}px`;
+    return randomContent.scrollHeight <= availableHeight;
+  }};
+
+  let lo, hi;
+  if (fits(1)) {{
+    lo = 1;
+    hi = 1.5;
+  }} else {{
+    lo = 0.4;
+    hi = 1;
+  }}
+  for (let i = 0; i < 8; i++) {{
+    const mid = (lo + hi) / 2;
+    if (fits(mid)) lo = mid; else hi = mid;
+  }}
+  fits(lo);
 }}
 
 function pickRandomMotion() {{
@@ -1251,10 +1415,12 @@ function clearMotionQueryParam() {{
 
 function closeRandomOverlay() {{
   randomOverlay.classList.remove('open');
+  presentationMode = false;
   clearMotionQueryParam();
 }}
 
 randomBtn.addEventListener('click', () => {{
+  presentationMode = false;
   pickRandomMotion();
   randomOverlay.classList.add('open');
 }});
@@ -1288,9 +1454,10 @@ randomCopyLinkBtn.addEventListener('click', () => {{
   }});
 }});
 
-function openMotionById(id) {{
+function openMotionById(id, presentation) {{
   const found = DATA.find(d => d.Id === id);
   if (!found) return false;
+  presentationMode = !!presentation;
   randomMotion = found;
   randomInfoslideRevealed = false;
   randomTopicRevealed = false;
@@ -1301,9 +1468,16 @@ function openMotionById(id) {{
   return true;
 }}
 
+let presentationResizeTimer = null;
+window.addEventListener('resize', () => {{
+  if (!presentationMode) return;
+  clearTimeout(presentationResizeTimer);
+  presentationResizeTimer = setTimeout(fitPresentationText, 150);
+}});
+
 const sharedMotionId = new URLSearchParams(location.search).get('motion');
 if (sharedMotionId) {{
-  openMotionById(sharedMotionId);
+  openMotionById(sharedMotionId, true);
 }}
 </script>
 </body>
@@ -1353,6 +1527,7 @@ def generate_html(csv_path: Path, html_path: Path) -> None:
         favicon=FAVICON_DATA_URI,
         guy=HEADER_GUY_SVG,
         build_id=_get_build_id(),
+        brand_color=BRAND_COLOR,
         **_get_impressum_fields(),
     )
     html_path.write_text(page_html, encoding="utf-8")
