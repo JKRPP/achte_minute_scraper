@@ -931,7 +931,7 @@ TEMPLATE = """<!doctype html>
     <div id="randomContent">
       <div class="random-reveal-area">
         <button type="button" class="random-reveal-btn" id="randomInfoslideBtn">Infoslide anzeigen</button>
-        <p class="random-no-infoslide" id="randomNoInfoslide" style="display:none;">Dieses Thema hat kein Infoslide.</p>
+        <p class="random-no-infoslide" id="randomNoInfoslide" style="display:none;">Dieses Thema hat keinen Infoslide.</p>
         <p class="random-infoslide-text" id="randomInfoslideText" style="display:none;"></p>
       </div>
       <div class="random-reveal-area">
@@ -1302,6 +1302,7 @@ let randomMotion = null;
 let randomInfoslideRevealed = false;
 let randomTopicRevealed = false;
 let presentationMode = false;
+let topicRevealedAt = null;
 
 function renderRandomMotion() {{
   if (!randomMotion) return;
@@ -1330,6 +1331,7 @@ function renderRandomMotion() {{
     <span class="badge badge-format">${{escapeHtml(randomMotion.Format)}}</span>
     <span>${{escapeHtml(randomMotion.Datum)}}</span>
     ${{randomMotion.Link ? `<a class="link" href="${{escapeHtml(randomMotion.Link)}}" target="_blank" rel="noopener">Artikel &#8599;</a>` : ''}}
+    ${{presentationMode && topicRevealedAt ? `<span>Thema aufgedeckt um ${{escapeHtml(topicRevealedAt.toLocaleTimeString())}}</span>` : ''}}
   ` : '';
 
   fitPresentationText();
@@ -1389,6 +1391,7 @@ function pickRandomMotion() {{
   randomMotion = pool[Math.floor(Math.random() * pool.length)];
   randomInfoslideRevealed = false;
   randomTopicRevealed = false;
+  topicRevealedAt = null;
   renderRandomMotion();
   setMotionQueryParam(randomMotion.Id);
 
@@ -1434,6 +1437,7 @@ randomInfoslideBtn.addEventListener('click', () => {{
 }});
 randomTopicBtn.addEventListener('click', () => {{
   randomTopicRevealed = true;
+  topicRevealedAt = new Date();
   renderRandomMotion();
 }});
 randomAgainBtn.addEventListener('click', () => pickRandomMotion());
@@ -1461,6 +1465,7 @@ function openMotionById(id, presentation) {{
   randomMotion = found;
   randomInfoslideRevealed = false;
   randomTopicRevealed = false;
+  topicRevealedAt = null;
   randomEmpty.style.display = 'none';
   randomContent.style.display = 'block';
   renderRandomMotion();
