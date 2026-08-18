@@ -959,6 +959,7 @@ TEMPLATE = """<!doctype html>
       <div class="random-actions">
         <button type="button" id="randomCopyBtn">Motion kopieren</button>
         <button type="button" id="randomCopyLinkBtn">Link kopieren</button>
+        <button type="button" id="randomPresentBtn">Präsentationsmodus</button>
         <button type="button" id="randomAgainBtn">Zufällige Motion</button>
       </div>
     </div>
@@ -1313,6 +1314,7 @@ const randomMeta = document.getElementById('randomMeta');
 const randomAgainBtn = document.getElementById('randomAgainBtn');
 const randomCopyBtn = document.getElementById('randomCopyBtn');
 const randomCopyLinkBtn = document.getElementById('randomCopyLinkBtn');
+const randomPresentBtn = document.getElementById('randomPresentBtn');
 const randomRevealStack = document.querySelector('.random-reveal-stack');
 const randomActionsEl = document.querySelector('.random-actions');
 
@@ -1327,6 +1329,8 @@ function renderRandomMotion() {{
 
   randomModal.classList.toggle('presentation-mode', presentationMode);
   randomModal.classList.toggle('controls-visible', !presentationMode || randomTopicRevealed);
+  randomOverlay.classList.toggle('presentation-mode', presentationMode);
+  randomPresentBtn.style.display = presentationMode ? 'none' : '';
 
   const hasInfoslide = (randomMotion.Factsheet ?? '').toString().trim() !== '';
   randomContent.classList.toggle('has-infoslide', hasInfoslide);
@@ -1429,7 +1433,10 @@ function setMotionQueryParam(id) {{
   const url = new URL(location.href);
   if (url.searchParams.get('motion') === id) return;
   url.searchParams.set('motion', id);
-  history.replaceState(null, '', url.pathname + url.search + url.hash);
+  // pushState (not replaceState) so each newly picked motion becomes its own
+  // history entry -- lets the browser back/forward buttons step through
+  // previously shown motions instead of leaving the page.
+  history.pushState(null, '', url.pathname + url.search + url.hash);
 }}
 
 function clearMotionQueryParam() {{
@@ -1464,6 +1471,11 @@ randomTopicBtn.addEventListener('click', () => {{
   renderRandomMotion();
 }});
 randomAgainBtn.addEventListener('click', () => pickRandomMotion());
+randomPresentBtn.addEventListener('click', () => {{
+  if (!randomMotion) return;
+  presentationMode = true;
+  renderRandomMotion();
+}});
 randomCopyBtn.addEventListener('click', () => {{
   if (!randomMotion) return;
   navigator.clipboard.writeText(buildMotionText(randomMotion)).then(() => {{
@@ -1501,6 +1513,16 @@ window.addEventListener('resize', () => {{
   if (!presentationMode) return;
   clearTimeout(presentationResizeTimer);
   presentationResizeTimer = setTimeout(fitPresentationText, 150);
+}});
+
+window.addEventListener('popstate', () => {{
+  const id = new URLSearchParams(location.search).get('motion');
+  if (id) {{
+    openMotionById(id, presentationMode);
+  }} else {{
+    randomOverlay.classList.remove('open');
+    presentationMode = false;
+  }}
 }});
 
 const sharedMotionId = new URLSearchParams(location.search).get('motion');
