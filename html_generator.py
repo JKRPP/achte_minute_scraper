@@ -18,7 +18,7 @@ import pandas as pd
 ## Single source of truth for the fixed brand color, also mirrored as the
 ## --brand CSS variable in TEMPLATE so the favicon and header logo can never
 ## drift out of sync with each other.
-BRAND_COLOR = "#6366f1"
+BRAND_COLOR = "#00a727"
 
 _IMPRESSUM_DEFAULTS = {
     "IMPRESSUM_NAME": "Max Mustermann",
@@ -100,28 +100,28 @@ TEMPLATE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root {{
-    --bg: #f7f7f8;
-    --card: #ffffff;
-    --text: #1a1a1e;
-    --muted: #6b7280;
-    --border: #e5e7eb;
-    --accent: #6366f1;
-    --accent-weak: #eef0fe;
-    --row-hover: #f3f4f6;
+    --bg: #f7f7f7;
+    --card: #fdfdfd;
+    --text: #1c1c1c;
+    --muted: #707070;
+    --border: #e6e6e6;
+    --accent: #058323;
+    --accent-weak: #ecf9ef;
+    --row-hover: #f1f1f1;
     --brand: {brand_color};
     --on-accent: #ffffff;
     --overlay-backdrop: rgba(0, 0, 0, .8);
   }}
   @media (prefers-color-scheme: dark) {{
     :root {{
-      --bg: #0f1115;
-      --card: #171a21;
-      --text: #e6e7eb;
-      --muted: #9aa0ab;
-      --border: #2a2e37;
-      --accent: #818cf8;
-      --accent-weak: #23263a;
-      --row-hover: #1d212b;
+      --bg: #121212;
+      --card: #1b1b1b;
+      --text: #e9e9e9;
+      --muted: #a1a1a1;
+      --border: #303030;
+      --accent: #129f33;
+      --accent-weak: #1d3f25;
+      --row-hover: #222222;
     }}
   }}
   * {{ box-sizing: border-box; }}
@@ -792,7 +792,7 @@ TEMPLATE = """<!doctype html>
 </head>
 <body>
 <header>
-  <h1>{guy}{title} <span class="build-id" title="Git commit + generation time">{build_id}</span></h1>
+  <h1>{guy}{heading} <span class="build-id" title="Git commit + generation time">{build_id}</span></h1>
   <div class="controls">
     <div class="search-row">
       <input type="search" id="search" placeholder="Suche in Thema, Factsheet, Runde...">
@@ -1520,7 +1520,8 @@ def generate_html(csv_path: Path, html_path: Path) -> None:
 
     records = df.to_dict(orient="records")
     page_html = TEMPLATE.format(
-        title=f"Achte Minute Themen",
+        title="Theminator",
+        heading="Der Theminator: Alle Themen der Achten Minute",
         count=len(records),
         source=csv_path.name,
         data_json=json.dumps(records, ensure_ascii=False),
