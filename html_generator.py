@@ -1331,6 +1331,7 @@ function renderRandomMotion() {{
   randomModal.classList.toggle('controls-visible', !presentationMode || randomTopicRevealed);
   randomOverlay.classList.toggle('presentation-mode', presentationMode);
   randomPresentBtn.style.display = presentationMode ? 'none' : '';
+  setBodyScrollLock(presentationMode);
 
   const hasInfoslide = (randomMotion.Factsheet ?? '').toString().trim() !== '';
   randomContent.classList.toggle('has-infoslide', hasInfoslide);
@@ -1446,9 +1447,15 @@ function clearMotionQueryParam() {{
   history.replaceState(null, '', url.pathname + url.search + url.hash);
 }}
 
+function setBodyScrollLock(locked) {{
+  document.documentElement.style.overflow = locked ? 'hidden' : '';
+  document.body.style.overflow = locked ? 'hidden' : '';
+}}
+
 function closeRandomOverlay() {{
   randomOverlay.classList.remove('open');
   presentationMode = false;
+  setBodyScrollLock(false);
   clearMotionQueryParam();
 }}
 
@@ -1522,6 +1529,7 @@ window.addEventListener('popstate', () => {{
   }} else {{
     randomOverlay.classList.remove('open');
     presentationMode = false;
+    setBodyScrollLock(false);
   }}
 }});
 
