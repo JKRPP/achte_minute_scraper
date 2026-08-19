@@ -76,7 +76,10 @@ def merge_csv_files_with_dedup(
 
 
 def clean_df(
-    input_df: pd.DataFrame, column_to_check="Runde", standardize_rounds=True
+    input_df: pd.DataFrame,
+    column_to_check="Runde",
+    standardize_rounds=True,
+    standardize_motions=True,
 ) -> pd.DataFrame:
     """
     Removes known 'non-topic' columns from topic dataframe
@@ -97,6 +100,27 @@ def clean_df(
             translate_dict = json.load(f)
         out_df = out_df.replace({column_to_check: translate_dict})
         print("Standardized round descriptors")
+    if standardize_motions:
+        out_df = standardize_df_motions(out_df)
+        print("Standardized motion types")
+    return out_df
+
+
+def standardize_df_motions(input_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Uses the translations in data/motion_type_abbreviations.json to expand abbreviations denoting motion types
+    """
+    out_df = input_df.copy()
+
+    with open(_DATA_DIR / "motion_type_abbreviations.json", "r", encoding="utf-8") as f:
+        abbreviations_dict = json.load(f)
+
+    for lang in ["GERMAN", "ENGLISH"]:
+        mask = input_df["Sprache"] == lang
+        out_df.loc[mask, "Thema"] = out_df.loc[mask, "Thema"].replace(
+            abbreviations_dict[lang], regex=True
+        )
+
     return out_df
 
 

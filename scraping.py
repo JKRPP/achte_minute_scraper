@@ -573,7 +573,7 @@ def _extract_format_from_topic(topic: str) -> str:
     if re.search(bp_pattern, topic_to_match, re.IGNORECASE):
         return "BP"
 
-    opd_pattern = r"^(Sollte|Soll|Sollten|Ist)\b"
+    opd_pattern = r"^(Sollte|Soll|Sollten|Ist|Würdest)\b"
     if re.match(opd_pattern, topic_to_match, re.IGNORECASE):
         return "OPD"
 
@@ -587,7 +587,7 @@ def _extract_tournament_name(url: str) -> str:
     out = url.removeprefix("https://www.achteminute.de/")
     out = out.split("/")[1]
     pattern_start = re.compile(
-        r"(?:gewinnt|gewinnen|siegreich|wins?)[- ](?:beim|den|die|das|dem|des|der|einen?|eine[mnrs]?|d[iea]|de[mnrs]?|the)?\s*(.+)$",
+        r"(?:gewinnt|gewinnen|siegreich|wins|triumphieren|triumphiert?)[- ](?:beim|den|die|das|dem|des|der|einen?|eine[mnrs]?|d[iea]|de[mnrs]?|the)?\s*(.+)$",
         re.IGNORECASE,
     )
 
@@ -625,7 +625,7 @@ def _extract_tournament_name(url: str) -> str:
     out = re.sub(overview_suffix_re, "", out).strip()
 
     pattern_end = re.compile(
-        r"(?:\s+(?:in|bei|am|im|vor|nach|aus|zu|vom|v\.)\s+[\w\s]+$)|(?:\s+\d{4}\s*$)|(?:\s+-\s+[\w\s]+$)",
+        r"(?:\s+(?:in|bei|beim|am|im|vor|nach|aus|zu|vom|v\.)\s+[\w\s]+$)|(?:\s+\d{4}\s*$)|(?:\s+-\s+[\w\s]+$)",
         re.IGNORECASE,
     )
 

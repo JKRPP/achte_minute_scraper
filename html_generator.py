@@ -968,6 +968,11 @@ TEMPLATE = """<!doctype html>
 
 <script>
 const DATA = {data_json};
+// Flat {{abbreviation: expansion}} map (e.g. "DHW" -> "Dieses Haus würde"),
+// merged from data/motion_type_abbreviations.json, so a search for the old
+// abbreviated phrasing (e.g. "DHW") still finds motions whose text was
+// standardized to the expanded form.
+const ABBREVIATION_EXPANSIONS = {abbreviations_json};
 
 const rowsEl = document.getElementById('rows');
 const searchEl = document.getElementById('search');
@@ -1121,6 +1126,31 @@ function normalizeForSearch(s) {{
     .replaceAll('ß', 'ss');
 }}
 
+function escapeRegExp(s) {{
+  const specials = '.*+?^${{}}()|[]\\\\';
+  let out = '';
+  for (const ch of s) {{
+    out += specials.includes(ch) ? '\\\\' + ch : ch;
+  }}
+  return out;
+}}
+
+
+const ABBREVIATION_ENTRIES = Object.entries(ABBREVIATION_EXPANSIONS)
+  .sort((a, b) => b[0].length - a[0].length)
+  .map(([abbr, expansion]) => {{
+    const trailingBoundary = /[A-Za-z0-9]$/.test(abbr) ? '\\\\b' : '';
+    return [new RegExp(`\\\\b${{escapeRegExp(abbr)}}${{trailingBoundary}}`, 'gi'), expansion];
+  }});
+
+function expandAbbreviations(s) {{
+  let expanded = (s ?? '').toString();
+  for (const [re, expansion] of ABBREVIATION_ENTRIES) {{
+    expanded = expanded.replace(re, expansion);
+  }}
+  return expanded;
+}}
+
 const VR_ROUND_RE = /^VR\\s*\\d+$/i;
 const LONG_TEXT_THRESHOLD = 150;
 
@@ -1138,7 +1168,9 @@ function updateFilterUi() {{
 }}
 
 function getFilteredData() {{
-  const q = normalizeForSearch(searchEl.value.trim());
+  const rawQuery = searchEl.value.trim();
+  const q = normalizeForSearch(rawQuery);
+  const qExpanded = normalizeForSearch(expandAbbreviations(rawQuery));
   const yearFrom = Number(yearFromEl.value);
   const yearTo = Number(yearToEl.value);
   const formatFilter = formatEl.value;
@@ -1162,11 +1194,14 @@ function getFilteredData() {{
       if (infoslideFilter === 'ohne' && hasInfoslide) return false;
     }}
     if (!q) return true;
-    return normalizeForSearch(d.Thema).includes(q)
-      || normalizeForSearch(d.Factsheet).includes(q)
+    const thema = normalizeForSearch(d.Thema);
+    const factsheet = normalizeForSearch(d.Factsheet);
+    return thema.includes(q)
+      || factsheet.includes(q)
       || normalizeForSearch(d.Runde).includes(q)
       || normalizeForSearch(d.Format).includes(q)
-      || normalizeForSearch(d.Tournament).includes(q);
+      || normalizeForSearch(d.Tournament).includes(q)
+      || (qExpanded !== q && (thema.includes(qExpanded) || factsheet.includes(qExpanded)));
   }});
 }}
 
@@ -1543,6 +1578,26 @@ if (sharedMotionId) {{
 """
 
 
+def _get_abbreviation_expansions() -> dict:
+    """
+    Flattens data/motion_type_abbreviations.json's per-language dicts (e.g.
+    {{"DHW ": "Dieses Haus würde "}}) into a single {{"DHW": "Dieses Haus
+    würde"}} map (trailing spaces stripped, languages merged - their
+    abbreviations don't collide), so the site's search can expand a query
+    like "DHW" to match motions whose text was standardized to the
+    expanded phrasing.
+    """
+    path = Path(__file__).parent / "data" / "motion_type_abbreviations.json"
+    with open(path, "r", encoding="utf-8") as f:
+        by_language = json.load(f)
+
+    expansions = {}
+    for replacements in by_language.values():
+        for abbr, expansion in replacements.items():
+            expansions[abbr.strip()] = expansion.strip()
+    return expansions
+
+
 def _motion_id(row: pd.Series) -> str:
     """
     Derives a stable id for a motion from content that uniquely identifies
@@ -1583,6 +1638,9 @@ def generate_html(csv_path: Path, html_path: Path) -> None:
         count=len(records),
         source=csv_path.name,
         data_json=json.dumps(records, ensure_ascii=False),
+        abbreviations_json=json.dumps(
+            _get_abbreviation_expansions(), ensure_ascii=False
+        ),
         favicon=FAVICON_DATA_URI,
         guy=HEADER_GUY_SVG,
         build_id=_get_build_id(),
