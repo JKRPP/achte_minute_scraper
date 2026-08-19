@@ -1,0 +1,20 @@
+{
+  "GERMAN": {
+    "DHW ": "Dieses Haus würde ",
+    "DHW,": "Dieses Haus würde,",
+    "DHG ": "Dieses Haus glaubt ",
+    "DHG,": "Dieses Haus glaubt,",
+    "DH ": "Dieses Haus "
+  },
+  "ENGLISH": {
+    "THB ": "This house believes ",
+    "THBT ": "This house believes that ",
+    "THO ": "This house opposes ",
+    "THP ": "This house prefers ",
+    "THR ": "This house regrets ",
+    "THS ": "This house supports ",
+    "THW ": "This house would ",
+    "THW,": "This house would,",
+    "TH ": "This house "
+  }
+}
