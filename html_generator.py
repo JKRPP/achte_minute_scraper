@@ -274,6 +274,55 @@ TEMPLATE = """<!doctype html>
     min-width: 220px;
     flex: 1;
   }}
+  .motion-typ-field {{
+    position: relative;
+  }}
+  .motion-typ-toggle {{
+    padding: .55rem .75rem;
+  }}
+  .motion-typ-popover {{
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: .3rem;
+    min-width: 260px;
+    max-height: 260px;
+    overflow-y: auto;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: .5rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .15);
+    z-index: 5;
+  }}
+  .motion-typ-popover.open {{ display: block; }}
+  .motion-typ-option {{
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: .85rem;
+    padding: .3rem .2rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }}
+  .motion-typ-option:hover {{ color: var(--accent); }}
+  .motion-typ-option input {{
+    margin: 0;
+    accent-color: var(--accent);
+  }}
+  .motion-typ-group-title {{
+    font-size: .7rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted);
+    padding: .3rem .2rem .1rem;
+  }}
+  .motion-typ-group-title:not(:first-child) {{
+    margin-top: .3rem;
+    border-top: 1px solid var(--border);
+    padding-top: .5rem;
+  }}
   .filter-field-full {{
     flex-basis: 100%;
     padding-top: .6rem;
@@ -850,6 +899,13 @@ TEMPLATE = """<!doctype html>
           <option value="nein">Nein</option>
         </select>
       </div>
+      <div class="filter-field motion-typ-field">
+        <span class="filter-field-title">Motion-Typ</span>
+        <button type="button" class="filter-toggle motion-typ-toggle" id="motionTypToggle">
+          Alle Typen <span class="badge-count" id="motionTypCount" style="display:none;">0</span>
+        </button>
+        <div class="motion-typ-popover" id="motionTypPopover"></div>
+      </div>
       <div class="filter-field filter-field-full">
         <span class="filter-field-title">Einstellungen</span>
         <div class="settings-groups">
@@ -984,6 +1040,9 @@ const formatEl = document.getElementById('formatFilter');
 const spracheEl = document.getElementById('spracheFilter');
 const infoslideEl = document.getElementById('infoslideFilter');
 const outroundEl = document.getElementById('outroundFilter');
+const motionTypToggle = document.getElementById('motionTypToggle');
+const motionTypPopover = document.getElementById('motionTypPopover');
+const motionTypCount = document.getElementById('motionTypCount');
 const countEl = document.getElementById('resultCount');
 const emptyEl = document.getElementById('emptyState');
 const filterToggle = document.getElementById('filterToggle');
@@ -1054,6 +1113,94 @@ for (const s of spracheValues) {{
   opt.textContent = SPRACHE_LABELS[s] ?? s;
   spracheEl.appendChild(opt);
 }}
+
+// Multi-select checkbox popover instead of a <select multiple> so an
+// arbitrary number of Motion-Typ values can be chosen without eating extra
+// vertical space in the filter panel -- only the toggle button (plus its
+// selected-count badge) sits inline with the other fields.
+const selectedMotionTypes = new Set();
+
+// Only Motion-Typ values that actually occur for the currently selected
+// Format are offered (BP and OPD use disjoint pattern label sets, so
+// showing all of them regardless of format would mostly be dead options).
+function getMotionTypeValuesForFormat(format) {{
+  const relevant = format ? DATA.filter(d => (d.Format ?? '') === format) : DATA;
+  return [...new Set(relevant.map(d => d['Motion-Typ'] ?? ''))].filter(Boolean).sort();
+}}
+
+function renderMotionTypOptions() {{
+  const format = formatEl.value;
+  // With no format selected, group the checkboxes by format (with a
+  // sub-heading per group) instead of one flat alphabetical list --
+  // otherwise BP and OPD motion-type labels interleave arbitrarily since
+  // they don't share a naming scheme (e.g. "Brauchen wir...?" sorting
+  // ahead of every BP label).
+  const formats = format
+    ? [format]
+    : [...new Set(DATA.map(d => d.Format ?? ''))].filter(Boolean).sort();
+
+  let groups = formats
+    .map(fmt => [fmt, getMotionTypeValuesForFormat(fmt)])
+    .filter(([, values]) => values.length);
+
+  // "Sonstige" is the shared unclassified-fallback label used by every
+  // format's pattern list, not a format-specific phrasing category -- when
+  // grouping by format, pull it out of each per-format group into one
+  // deduplicated group of its own instead of listing it redundantly under
+  // every format heading.
+  const OTHER_LABEL = 'Sonstige';
+  if (groups.length > 1) {{
+    const hasOther = groups.some(([, values]) => values.includes(OTHER_LABEL));
+    groups = groups
+      .map(([fmt, values]) => [fmt, values.filter(t => t !== OTHER_LABEL)])
+      .filter(([, values]) => values.length);
+    if (hasOther) groups.push([OTHER_LABEL, [OTHER_LABEL]]);
+  }}
+
+  // Drop selections that no longer apply under the new format, so the
+  // toggle badge and getFilteredData() stay consistent with what's shown.
+  const allValues = groups.flatMap(([, values]) => values);
+  for (const t of [...selectedMotionTypes]) {{
+    if (!allValues.includes(t)) selectedMotionTypes.delete(t);
+  }}
+
+  motionTypPopover.innerHTML = '';
+  for (const [fmt, values] of groups) {{
+    if (groups.length > 1) {{
+      const heading = document.createElement('div');
+      heading.className = 'motion-typ-group-title';
+      heading.textContent = fmt;
+      motionTypPopover.appendChild(heading);
+    }}
+    for (const t of values) {{
+      const label = document.createElement('label');
+      label.className = 'motion-typ-option';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = t;
+      cb.checked = selectedMotionTypes.has(t);
+      cb.addEventListener('change', () => {{
+        if (cb.checked) selectedMotionTypes.add(t);
+        else selectedMotionTypes.delete(t);
+        renderResetPage();
+      }});
+      label.appendChild(cb);
+      label.append(t);
+      motionTypPopover.appendChild(label);
+    }}
+  }}
+}}
+renderMotionTypOptions();
+
+motionTypToggle.addEventListener('click', (e) => {{
+  e.stopPropagation();
+  motionTypPopover.classList.toggle('open');
+}});
+document.addEventListener('click', (e) => {{
+  if (!motionTypPopover.contains(e.target) && e.target !== motionTypToggle) {{
+    motionTypPopover.classList.remove('open');
+  }}
+}});
 
 function escapeHtml(s) {{
   return (s ?? '').toString()
@@ -1169,11 +1316,15 @@ function isOutround(round) {{
 
 function updateFilterUi() {{
   const yearActive = Number(yearFromEl.value) !== yearMin || Number(yearToEl.value) !== yearMax;
-  const activeCount = [yearActive, formatEl.value, spracheEl.value, infoslideEl.value, outroundEl.value]
+  const activeCount = [yearActive, formatEl.value, spracheEl.value, infoslideEl.value, outroundEl.value, selectedMotionTypes.size > 0]
     .filter(Boolean).length;
   filterCount.style.display = activeCount ? 'inline-flex' : 'none';
   filterCount.textContent = activeCount;
   filterToggle.classList.toggle('active', activeCount > 0);
+
+  motionTypCount.style.display = selectedMotionTypes.size ? 'inline-flex' : 'none';
+  motionTypCount.textContent = selectedMotionTypes.size;
+  motionTypToggle.classList.toggle('active', selectedMotionTypes.size > 0);
 }}
 
 function getFilteredData() {{
@@ -1202,6 +1353,7 @@ function getFilteredData() {{
       if (infoslideFilter === 'mit' && !hasInfoslide) return false;
       if (infoslideFilter === 'ohne' && hasInfoslide) return false;
     }}
+    if (selectedMotionTypes.size && !selectedMotionTypes.has(d['Motion-Typ'] ?? '')) return false;
     if (!q) return true;
     const thema = normalizeForSearch(d.Thema);
     const factsheet = normalizeForSearch(d.Factsheet);
@@ -1302,7 +1454,10 @@ document.querySelectorAll('thead th').forEach(th => {{
 searchEl.addEventListener('input', renderResetPage);
 yearFromEl.addEventListener('input', renderResetPage);
 yearToEl.addEventListener('input', renderResetPage);
-formatEl.addEventListener('change', renderResetPage);
+formatEl.addEventListener('change', () => {{
+  renderMotionTypOptions();
+  renderResetPage();
+}});
 spracheEl.addEventListener('change', renderResetPage);
 infoslideEl.addEventListener('change', renderResetPage);
 outroundEl.addEventListener('change', renderResetPage);
@@ -1635,6 +1790,7 @@ def generate_html(csv_path: Path, html_path: Path) -> None:
                 "Link",
                 "Datum",
                 "Tournament",
+                "Motion-Typ",
             )
             if c in df.columns
         ]

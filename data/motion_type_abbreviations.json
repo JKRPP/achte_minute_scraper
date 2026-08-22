@@ -4,7 +4,8 @@
     "DHW,": "Dieses Haus würde,",
     "DHG ": "Dieses Haus glaubt ",
     "DHG,": "Dieses Haus glaubt,",
-    "DH ": "Dieses Haus "
+    "DH ": "Dieses Haus ",
+    "DH,": "Dieses Haus,"
   },
   "ENGLISH": {
     "THB ": "This house believes ",
@@ -15,6 +16,7 @@
     "THS ": "This house supports ",
     "THW ": "This house would ",
     "THW,": "This house would,",
-    "TH ": "This house "
+    "TH ": "This house ",
+    "TH, ": "This house, "
   }
 }
