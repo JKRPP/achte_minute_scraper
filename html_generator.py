@@ -609,9 +609,35 @@ TEMPLATE = """<!doctype html>
     td.col-meta, td.col-link {{
       display: none;
     }}
+    /* Regular select fields (Format, Sprache, Factsheet, Outround) only
+       take their intrinsic content width by default, leaving dead space
+       to their right when flex-wrap packs 2-3 per row on a narrow screen.
+       Letting them grow evenly fills that space while still allowing
+       multiple per row and wrapping once they don't fit -- excludes the
+       fields that already force their own full-width row below. */
+    .filter-field:not(.filter-field-full):not(.filter-field-range):not(.motion-typ-field) {{
+      flex: 1 1 140px;
+    }}
     .filter-field-range {{
       max-width: none;
       flex-basis: 100%;
+    }}
+    /* Force Motion-Typ onto its own full-width row instead of letting
+       flex-wrap pack it in with whatever neighbors happen to fit -- its
+       popover is position:absolute with a fixed min-width, so if the
+       toggle button ends up placed near the row's right edge (as it did
+       depending on how many other fields shared that row), the popover
+       overflowed past the viewport and caused page-wide horizontal
+       scrolling until a selection changed the button's width enough to
+       force a rewrap. Full-width placement plus left/right: 0 below makes
+       the popover always exactly match the field's own width instead. */
+    .motion-typ-field {{
+      flex-basis: 100%;
+    }}
+    .motion-typ-popover {{
+      left: 0;
+      right: 0;
+      min-width: 0;
     }}
     .search-row {{
       flex-wrap: wrap;
