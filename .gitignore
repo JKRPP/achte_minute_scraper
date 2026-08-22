@@ -4,5 +4,6 @@ __pycache__/*
 *.pyc
 *.csv
 articles/*
+analysis/*
 index.html
 *_links.json

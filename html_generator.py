@@ -1060,6 +1060,15 @@ function escapeHtml(s) {{
     .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }}
 
+const LINK_RE = /\\[([^\\[\\]]+)\\]\\((https?:\\/\\/[^\\s()<>"]+)\\)|(https?:\\/\\/[^\\s<>")]+)/g;
+function linkifyHtml(s) {{
+  return escapeHtml(s).replace(LINK_RE, (match, mdText, mdUrl, bareUrl) => {{
+    const url = mdUrl ?? bareUrl;
+    const text = mdText ?? bareUrl;
+    return `<a class="link" href="${{url}}" target="_blank" rel="noopener">${{text}}</a>`;
+  }});
+}}
+
 const COPY_ICON_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
 const LINK_ICON_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14 21 3"></path><path d="M15 3h6v6"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>';
 
@@ -1245,7 +1254,7 @@ function render() {{
         </div>
       </td>
       <td class="thema">${{escapeHtml(d.Thema)}}<button type="button" class="copy-btn" title="Motion kopieren" aria-label="Motion kopieren">${{COPY_ICON_SVG}}</button></td>
-      <td class="factsheet">${{escapeHtml(d.Factsheet)}}</td>
+      <td class="factsheet">${{linkifyHtml(d.Factsheet)}}</td>
       <td class="col-link">
         <div class="link-stack">
           <a class="link" href="${{escapeHtml(buildMotionShareUrl(d))}}"${{isSameTabMode() ? '' : ' target="_blank" rel="noopener"'}}>Anzeigen${{LINK_ICON_SVG}}</a>
@@ -1374,7 +1383,7 @@ function renderRandomMotion() {{
   randomInfoslideBtn.style.display = hasInfoslide && !randomInfoslideRevealed ? 'inline-block' : 'none';
   randomNoInfoslide.style.display = !hasInfoslide && !randomTopicRevealed ? 'block' : 'none';
   randomInfoslideText.style.display = hasInfoslide && randomInfoslideRevealed ? 'block' : 'none';
-  randomInfoslideText.textContent = randomMotion.Factsheet ?? '';
+  randomInfoslideText.innerHTML = linkifyHtml(randomMotion.Factsheet ?? '');
   randomInfoslideText.classList.toggle('long-text', (randomMotion.Factsheet ?? '').toString().length > LONG_TEXT_THRESHOLD);
 
   randomTopicBtn.style.display = randomTopicRevealed ? 'none' : 'inline-block';

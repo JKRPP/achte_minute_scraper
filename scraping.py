@@ -184,11 +184,24 @@ def extract_date_from_url(url: str) -> Optional[str]:
         return None
 
 
+def _linkify_anchors(blockquote) -> None:
+    """
+    Replaces <a href="..."> tags with a "[text](href)" markdown-style
+    string, so links formatted as words (e.g. "hier") survive being
+    flattened to plain text.
+    """
+    for a in blockquote.find_all("a"):
+        href = a.get("href", "").strip()
+        text = a.get_text().strip()
+        a.replace_with(f"[{text}]({href})" if href else text)
+
+
 def _blockquote_segments(blockquote) -> List[str]:
     """
     Flattens a <blockquote> into logical segments (one topic/factsheet/round
     label per segment).
     """
+    _linkify_anchors(blockquote)
     segments = []
     elements = blockquote.find_all(
         lambda tag: tag.name == "p"
