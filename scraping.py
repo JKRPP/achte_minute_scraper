@@ -52,8 +52,7 @@ _LINEUP_MARKER_RE = re.compile(
     # (Opening/Closing Government/Opposition). Kept case-sensitive (even
     # though the rest of the pattern isn't) so this doesn't also match an
     # ordinary capitalized word like "So:" at the start of a sentence.
-    r"|(?-i:ER|EO|SR|SO|OG|OO|CG|CO))\s*:"
-    r"|(?<!\S)Es\s+jurierten\b",
+    r"|(?-i:ER|EO|SR|SO|OG|OO|CG|CO))\s*:" r"|(?<!\S)Es\s+jurierten\b",
     re.IGNORECASE,
 )
 
@@ -68,6 +67,15 @@ _TURNIERE_CATEGORY_ID = 46
 
 with open(_DATA_DIR / "tournament_title_replacements.json", "r", encoding="utf-8") as f:
     _TOURNAMENT_TITLE_REPLACEMENTS = json.load(f)
+
+# Common typos (e.g. "Diese Haus" -> "Dieses Haus") found in topics/
+# factsheets, corrected before format/language detection so they aren't
+# silently defeated by a misspelled key phrase.
+with open(_DATA_DIR / "common_typos.json", "r", encoding="utf-8") as f:
+    _COMMON_TYPOS = {typo.lower(): fix for typo, fix in json.load(f).items()}
+_COMMON_TYPO_RE = re.compile(
+    "|".join(rf"\b{re.escape(typo)}\b" for typo in _COMMON_TYPOS), re.IGNORECASE
+)
 
 # Manual overrides for articles whose headline phrasing doesn't fit any
 # general pattern (e.g. "X, Y und Z sind die Sieger der ..."). Keyed by the
@@ -370,6 +378,13 @@ def _split_leading_parenthetical(
     return inner, remainder
 
 
+def _fix_common_typos(text: str) -> str:
+    """Corrects known common typos (see common_typos.json) in a topic/factsheet."""
+    if not text:
+        return text
+    return _COMMON_TYPO_RE.sub(lambda m: _COMMON_TYPOS[m.group(0).lower()], text)
+
+
 def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, str]]:
     """
     Turns a round's accumulated segments into a {Runde, Thema, Factsheet, Format}
@@ -450,6 +465,14 @@ def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, 
     factsheet = _normalize_whitespace(
         _strip_quotes(" ".join(part for part in stripped_parts if part).strip())
     )
+
+    # Fix common typos (e.g. "Diese Haus" -> "Dieses Haus") before anything
+    # downstream matches against the topic/factsheet text - format and
+    # language detection both key off exact phrases, and a typo silently
+    # defeats them.
+    topic = _fix_common_typos(topic)
+    factsheet = _fix_common_typos(factsheet)
+
     topic_format = _extract_format_from_topic(topic)
 
     if topic_format == "unbekannt":

@@ -139,18 +139,21 @@ def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
     bp_filtering_patterns = [
         (r"Dieses Haus glaubt.*sollte", "Dieses Haus glaubt, X sollte..."),
         (r"Dieses Haus (?:würde|verbietet|hätte)", "Dieses Haus würde..."),
-        (r"Würde dieses Haus", "Dieses Haus würde..."),
-        (r"Dieses Haus,?\s*[-–—]?\s*als", "Dieses Haus als..."),
+        (r"(?:Würde|Erlaubt) dieses Haus", "Dieses Haus würde..."),
+        (r"Dieses Haus,?\s*[-–—]?\s*(?:als|welches.*ist)", "Dieses Haus als..."),
         (r"Dieses Haus glaubt", "Dieses Haus glaubt..."),
         (r"Dieses Haus bereut", "Dieses Haus bereut..."),
-        (r"Dieses Haus (?:bedauert|verurteilt)", "Dieses Haus bedauert..."),
+        (r"Dieses Haus (?:bedauert|verurteilt|hasst)", "Dieses Haus bedauert..."),
         (r"Dieses Haus lehnt.*ab", "Dieses Haus bedauert..."),
         (r"Dieses Haus hält.*für falsch", "Dieses Haus bedauert..."),
         (
             r"Dieses Haus (?:begrüßt|befürwortet|unterstützt|wünscht|möchte|feiert)",
             "Dieses haus begrüßt...",
         ),
-        (r"Dieses Haus (?:bevorzugt|präferiert|zieht)", "Dieses Haus bevorzugt..."),
+        (
+            r"Dieses Haus (?:bevorzugt|präferiert|zieht|entscheidet sich)",
+            "Dieses Haus bevorzugt...",
+        ),
         (r"This house believes.*should", "Dieses Haus glaubt, X sollte..."),
         (r"This house would", "Dieses Haus würde..."),
         (r"This house,?\s*[-–—]?\s*as", "Dieses Haus als..."),
@@ -169,12 +172,13 @@ def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
             "Ist x zu bereuen/bedauern?",
         ),
         (r"\bim\s+interesse\b", "Ist x im Interesse von y?"),
+        (r"\bin the interest\b", "Ist x in Interesse von y?"),
         (r"\bhätten?\b.*\btun\s+sollen\b", "Hätte x y tun sollen?"),
         (r"\bsoll(?:en|test|te|ten)?\b", "Sollten wir/Sollte x...?"),
         (r"\bbrauchen\s+wir\b", "Brauchen wir..?"),
         (r"\bshould\b", "Sollten wir/Sollte x...?"),
         (
-            r"\bverpflichtung\b|\bmoralisch richtig\b|\bmoralische\s+pflicht\b|\bmoralisch\s+gerechtfertigt\b",
+            r"\bverpflichtung\b|\bmoralisch richtig\|\blegitimes mittel\b|\bmoralische\s+pflicht\b|\bmoralisch\s+gerechtfertigt\b",
             "Ist x (un-) moralisch?",
         ),
         (
@@ -185,8 +189,9 @@ def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
             r"\bschad(?:et|en)\b.*\bn(?:ü|u)tz(?:t|en)\b",
             "Schadet x mehr als es nutzt?",
         ),
+        (r"\bdo more harm than good\b", "Schadet x mehr als es nutzt?"),
         (
-            r"\bbevorzug\w*\b|\bvorzuzieh\w*\b|\bvorzieh\w*\b|\bpräferier\w*\b|\bwichtiger,? als\b",
+            r"\bbevorzug\w*\b|\bvorzuzieh\w*\b|\bpreferable\b|\bvorzieh\w*\b|\bpräferier\w*\b|\bwichtiger,? als\b",
             "Ist x zu bevorzugen?",
         ),
         (
