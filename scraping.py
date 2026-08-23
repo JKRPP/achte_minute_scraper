@@ -23,6 +23,14 @@ _QUOTE_CHARS = "\"'„“”‚‘’«»"
 
 _LABEL_WORD_RE = re.compile(r"^([A-Za-zÀ-ÿ]+)\s*:?\s*")
 _LABEL_STEMS = ("info", "fact", "definition", "beispiel")
+# A segment "looks like a topic" if it ends in a question (OPD-style) or
+# opens with a known motion phrasing (BP-style) - used to tell a round's
+# real topic apart from trailing narrative prose in "story" articles (see
+# _finalize_round).
+_TOPIC_LIKE_RE = re.compile(
+    r"\?\s*$|^(?:DH|Dieses Haus|Diese Haus|This house|TH)\b|^(?:Sollte|Soll|Sollten|Ist|Würdest)\b",
+    re.IGNORECASE,
+)
 _DATE_IN_URL_RE = re.compile(r"/(\d{8})/")
 # Matches a year and everything after it in an extracted tournament name -
 # it's already tracked separately in the "Datum" column, and whatever
@@ -378,6 +386,11 @@ def _split_leading_parenthetical(
     return inner, remainder
 
 
+def _looks_like_topic(text: str) -> bool:
+    """See _TOPIC_LIKE_RE."""
+    return bool(_TOPIC_LIKE_RE.search(text.strip()))
+
+
 def _fix_common_typos(text: str) -> str:
     """Corrects known common typos (see common_typos.json) in a topic/factsheet."""
     if not text:
@@ -393,7 +406,14 @@ def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, 
     if round_label is None or not content:
         return None
 
-    topic_index = len(content) - 1
+    topic_index = None
+    fallback_topic_index = None
+    # Segments that get scanned past while looking for the topic (see
+    # below) but that neither look like a topic nor like recognized
+    # factsheet content - e.g. a "story" article's narrative prose bridging
+    # one round's topic to the next - shouldn't end up glued into the
+    # factsheet either, so they're dropped entirely.
+    dropped_indices = set()
     for i in range(len(content) - 1, -1, -1):
         label_match = _LABEL_WORD_RE.match(content[i])
         is_labeled = bool(
@@ -420,11 +440,27 @@ def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, 
             or is_footnote
         ):
             continue
-        topic_index = i
-        break
+
+        if fallback_topic_index is None:
+            fallback_topic_index = i
+        if _looks_like_topic(content[i]):
+            topic_index = i
+            break
+        dropped_indices.add(i)
+
+    if topic_index is None:
+        # Nothing scanned looked like a topic (shouldn't normally happen) -
+        # fall back to the previous behavior of just using the last
+        # non-excluded segment, rather than dropping every candidate.
+        topic_index = fallback_topic_index if fallback_topic_index is not None else len(content) - 1
+        dropped_indices.discard(topic_index)
 
     topic = content[topic_index]
-    factsheet_parts = content[:topic_index] + content[topic_index + 1 :]
+    factsheet_parts = [
+        part
+        for idx, part in enumerate(content)
+        if idx != topic_index and idx not in dropped_indices
+    ]
 
     topic_label_match = _LABEL_WORD_RE.match(topic)
     if topic_label_match and topic_label_match.group(1).lower().startswith(
