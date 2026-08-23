@@ -46,7 +46,13 @@ _SECTION_HEADER_RE = re.compile(r"^[A-Za-zÀ-ÿ]+(?:\s[A-Za-zÀ-ÿ]+)+:$")
 # content contains one of these is a lineup blurb, not a topic, and should
 # be dropped rather than mining a person's name out of it as the "topic".
 _LINEUP_MARKER_RE = re.compile(
-    r"(?<!\S)(Regierung|Reg|Opposition|Opp|(?:Fraktionsfreie|Freie)\s+Redner|FFR)\s*:"
+    r"(?<!\S)(Regierung|Reg|Opposition|Opp|(?:Fraktionsfreie|Freie)\s+Redner|FFR"
+    # Abbreviated position labels: German ER/EO/SR/SO (Eröffnende/
+    # Schließende Regierung/Opposition) and BP's English OG/OO/CG/CO
+    # (Opening/Closing Government/Opposition). Kept case-sensitive (even
+    # though the rest of the pattern isn't) so this doesn't also match an
+    # ordinary capitalized word like "So:" at the start of a sentence.
+    r"|(?-i:ER|EO|SR|SO|OG|OO|CG|CO))\s*:"
     r"|(?<!\S)Es\s+jurierten\b",
     re.IGNORECASE,
 )

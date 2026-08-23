@@ -138,9 +138,9 @@ def standardize_df_motions(input_df: pd.DataFrame) -> pd.DataFrame:
 def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
     bp_filtering_patterns = [
         (r"Dieses Haus glaubt.*sollte", "Dieses Haus glaubt, X sollte..."),
-        (r"Dieses Haus (?:würde|verbietet)", "Dieses Haus würde..."),
+        (r"Dieses Haus (?:würde|verbietet|hätte)", "Dieses Haus würde..."),
         (r"Würde dieses Haus", "Dieses Haus würde..."),
-        (r"Dieses Haus,? als", "Dieses Haus als..."),
+        (r"Dieses Haus,?\s*[-–—]?\s*als", "Dieses Haus als..."),
         (r"Dieses Haus glaubt", "Dieses Haus glaubt..."),
         (r"Dieses Haus bereut", "Dieses Haus bereut..."),
         (r"Dieses Haus (?:bedauert|verurteilt)", "Dieses Haus bedauert..."),
@@ -153,13 +153,13 @@ def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
         (r"Dieses Haus (?:bevorzugt|präferiert|zieht)", "Dieses Haus bevorzugt..."),
         (r"This house believes.*should", "Dieses Haus glaubt, X sollte..."),
         (r"This house would", "Dieses Haus würde..."),
-        (r"This house,? as", "Dieses Haus als..."),
+        (r"This house,?\s*[-–—]?\s*as", "Dieses Haus als..."),
         (r"This house believes", "Dieses Haus glaubt..."),
         (r"This house opposes", "Dieses Haus bedauert..."),
         (r"This house regrets", "Dieses Haus bereut..."),
         (r"This house supports", "Dieses haus begrüßt..."),
         (r"This house prefers", "Dieses Haus bevorzugt..."),
-        (r"This house hopen", "Dieses Haus hofft..."),
+        (r"This house hopes", "Dieses Haus hofft..."),
         (r"This house predicts", "Dieses Haus sagt vorraus..."),
     ]
 
@@ -186,14 +186,14 @@ def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
             "Schadet x mehr als es nutzt?",
         ),
         (
-            r"\bbevorzug\w*\b|\bvorzuzieh\w*\b|\bvorzieh\w*\b|\bpräferier\w*\b",
+            r"\bbevorzug\w*\b|\bvorzuzieh\w*\b|\bvorzieh\w*\b|\bpräferier\w*\b|\bwichtiger,? als\b",
             "Ist x zu bevorzugen?",
         ),
         (
-            r"ist es besser",
+            r"(?:ist|wäre) es besser",
             "Ist x zu bevorzugen?",
         ),
-        (r"\b(?:wäre|ist)\b.*\b(?:gut|schlecht)\b", "Ist x gut/schlecht?"),
+        (r"\b(?:wäre|ist|sind)\b.*\b(?:gut|schlecht)\b", "Ist x gut/schlecht?"),
         (r"\bunmoralisch\b|\bmoralisch\s+falsch\b", "Ist x (un-) moralisch?"),
         (
             r"\b(?:bedauern|bedauert|bereuen|bereut|bedauernswert|begrüßenswert|bedauerlich|begrüßenswerte)\b",
