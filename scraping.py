@@ -24,6 +24,10 @@ _QUOTE_CHARS = "\"'„“”‚‘’«»"
 _LABEL_WORD_RE = re.compile(r"^([A-Za-zÀ-ÿ]+)\s*:?\s*")
 _LABEL_STEMS = ("info", "fact", "definition", "beispiel")
 _DATE_IN_URL_RE = re.compile(r"/(\d{8})/")
+# Matches a year and everything after it in an extracted tournament name -
+# it's already tracked separately in the "Datum" column, and whatever
+# follows a year in a headline is never still part of the tournament name.
+_YEAR_CUTOFF_RE = re.compile(r"\s*(?:19|20)\d{2}\b.*$")
 _ROUND_LABEL_LINE_RE = re.compile(
     # The colon must not be directly followed by a lowercase letter, so
     # gender-colon notation (e.g. "Streamer:innen") in running text isn't
@@ -65,6 +69,20 @@ with open(_DATA_DIR / "tournament_title_replacements.json", "r", encoding="utf-8
 # specific to that one headline rather than a reusable pattern.
 with open(_DATA_DIR / "tournament_name_overrides.json", "r", encoding="utf-8") as f:
     _TOURNAMENT_NAME_OVERRIDES = json.load(f)
+
+# Maps a German cardinal-direction word to the initial used in a regional
+# championship's abbreviation (e.g. "nordost" -> "NO", so "Nordostdeutsche
+# Debattiermeisterschaft" abbreviates to "NODM").
+_DIRECTION_INITIALS = {"nord": "N", "ost": "O", "süd": "S", "sued": "S", "west": "W"}
+_REGION_MEISTERSCHAFT_RE = re.compile(
+    r"^((?:nord|ost|süd|sued|west)+)deutsche\s+(?:Debattier)?[Mm]eisterschaft$",
+    re.IGNORECASE,
+)
+# A regional championship's abbreviation is always its compass initials
+# followed by "DM" (e.g. "NODM", "WDM") - matches an abbreviation some
+# early "Regionalmeisterschaften" roundup articles already use in their
+# intro sentence (e.g. "Alle weiteren Themen der NODM in der Übersicht:").
+_REGION_ABBREVIATION_RE = re.compile(r"^[NOSW]{1,3}DM$")
 
 with open(_DATA_DIR / "round_translations.json", "r", encoding="utf-8") as f:
     _ROUND_TRANSLATIONS = json.load(f)
@@ -501,6 +519,131 @@ def download_article(url: str, overwrite=False):
     return soup
 
 
+# A standalone paragraph naming just a host city/region (e.g. "Ingolstadt"),
+# used by older articles (pre-2014ish) to separate multiple regional
+# tournaments covered in one post, before they got grouped under an <h3>
+# with the region's actual championship name (e.g. "Norddeutsche
+# Debattiermeisterschaft"). Recognized as a <p> whose entire text is a
+# single <strong> run, isn't a content-type label like "Teambreak:" (which
+# also renders as a lone bold paragraph), and is short enough to be a name
+# rather than a sentence.
+_SECTION_CITY_PARAGRAPH_MAX_LEN = 40
+
+# Matches the lead-in sentence used by some early roundup articles instead
+# of a proper heading, e.g. "Alle weiteren Themen der NODM in der
+# Übersicht:" or "... der WDM in der Übersicht:".
+_SECTION_ABBREVIATION_INTRO_RE = re.compile(
+    r"Themen\s+de[rs]\s+([A-ZÄÖÜ]{2,6})\s+in\s+der\s+(?:Übersicht|Ubersicht)",
+    re.IGNORECASE,
+)
+
+# Recurring result/jury-related labels that (like a real section heading)
+# can render as a single standalone bold paragraph, e.g. "Jurierendenbreak"
+# with no trailing colon - excluded so they aren't mistaken for a section.
+_SECTION_HEADING_BLOCKLIST_RE = re.compile(
+    r"break|jur(?:y|ier|or)|tabmaster|casefile|equity|rednerinnen|top\s*\d",
+    re.IGNORECASE,
+)
+
+
+def _section_headings_by_blockquote(soup: BeautifulSoup) -> Dict[int, str]:
+    """
+    Maps each <blockquote> (by id()) in the article to the name of the
+    tournament section it belongs to, for articles covering multiple
+    regional tournaments in a single post. Returns an empty mapping for
+    ordinary single-tournament articles (nothing before their first, and
+    only, blockquote looks like a section heading).
+    """
+    sections: Dict[int, str] = {}
+    current: Optional[str] = None
+
+    for tag in soup.find_all(["h3", "p", "blockquote"]):
+        if tag.name == "h3":
+            text = tag.get_text(strip=True)
+            if text:
+                current = text
+        elif tag.name == "p":
+            text = tag.get_text(strip=True)
+
+            abbreviation_match = _SECTION_ABBREVIATION_INTRO_RE.search(text)
+            if abbreviation_match:
+                current = abbreviation_match.group(1).upper()
+                continue
+
+            strongs = tag.find_all(["strong", "b"])
+            if (
+                text
+                and not text.endswith(":")
+                and len(text) <= _SECTION_CITY_PARAGRAPH_MAX_LEN
+                and len(strongs) == 1
+                and strongs[0].get_text(strip=True) == text
+                and not _SECTION_HEADING_BLOCKLIST_RE.search(text)
+            ):
+                current = text
+        else:  # blockquote
+            if current is not None:
+                sections[id(tag)] = current
+
+    # A single-tournament article can still contain one stray paragraph
+    # that looks like a section heading (e.g. an unusually-phrased result
+    # label). Only trust the detected sections once they actually
+    # distinguish 2+ tournaments - otherwise fall back to the article-level
+    # tournament name for every entry.
+    if len(set(sections.values())) < 2:
+        return {}
+
+    return sections
+
+
+def _abbreviate_region_name(name: str) -> Optional[str]:
+    """
+    Abbreviates a regional championship's name (e.g. "Nordostdeutsche
+    Debattiermeisterschaft" or already-abbreviated "NODM") to its canonical
+    form, or returns None if name isn't a regional-championship name at all
+    (e.g. a host city or a one-off tournament name).
+    """
+    name = name.strip()
+
+    if _REGION_ABBREVIATION_RE.match(name.upper()):
+        return name.upper()
+
+    match = _REGION_MEISTERSCHAFT_RE.match(name)
+    if not match:
+        return None
+
+    directions = match.group(1).lower()
+    initials = ""
+    while directions:
+        for word, initial in _DIRECTION_INITIALS.items():
+            if directions.startswith(word):
+                initials += initial
+                directions = directions[len(word) :]
+                break
+        else:
+            return None
+
+    return f"{initials}DM"
+
+
+def _tournament_name_for_section(section: str) -> str:
+    """
+    Builds a concrete tournament name for one section of a multi-tournament
+    article (see _section_headings_by_blockquote). Sections naming a
+    regional championship (spelled out or already abbreviated) are
+    abbreviated (e.g. "NDM"); sections that are just a host city (older
+    articles) are phrased as a regional championship instead. The year
+    isn't included - it's already tracked separately in the "Datum" column.
+    """
+    if section.isupper() and " " in section:
+        section = section.title()
+
+    abbreviation = _abbreviate_region_name(section)
+    if abbreviation:
+        return abbreviation
+
+    return f"Regionalmeisterschaft {section}"
+
+
 def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
     """
     Extracts round/topic/factsheet triples from an article page.
@@ -511,14 +654,22 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
       - Every segment up to (not including) the next round label belongs to
         that round, with the last one being the topic and everything before
         it forming the factsheet (see _finalize_round).
+
+    Some articles (e.g. the yearly "Regionalmeisterschaften" roundup) cover
+    several regional tournaments in one post; entries are attributed to the
+    specific one they came from rather than the article as a whole (see
+    _section_headings_by_blockquote).
     """
     soup = download_article(url)
     date = extract_date_from_url(url)
+    sections = _section_headings_by_blockquote(soup)
 
     entries = []
     for blockquote in soup.find_all("blockquote"):
+        section = sections.get(id(blockquote))
         current_round = None
         current_content: List[str] = []
+        blockquote_entries: List[Dict[str, str]] = []
 
         for segment in _blockquote_segments(blockquote):
             if not any(c.isalnum() for c in segment) or _SECTION_HEADER_RE.match(
@@ -541,7 +692,7 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
                 if not any(_LINEUP_MARKER_RE.search(c) for c in current_content):
                     entry = _finalize_round(current_round, current_content)
                     if entry:
-                        entries.append(entry)
+                        blockquote_entries.append(entry)
 
                 current_round = label_match.group(1).strip()
                 remainder = label_match.group(2).strip()
@@ -556,13 +707,20 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
         if not any(_LINEUP_MARKER_RE.search(c) for c in current_content):
             entry = _finalize_round(current_round, current_content)
             if entry:
-                entries.append(entry)
+                blockquote_entries.append(entry)
+
+        for entry in blockquote_entries:
+            entry["_section"] = section
+        entries.extend(blockquote_entries)
 
     tournament_name = _extract_tournament_name(url, _extract_title(soup))
 
     for entry in entries:
+        section = entry.pop("_section", None)
         entry["Link"] = url
-        entry["Tournament"] = tournament_name
+        entry["Tournament"] = (
+            _tournament_name_for_section(section) if section else tournament_name
+        )
         entry["Datum"] = date
         entry["Format"] = _extract_format_from_topic(entry["Thema"])
 
@@ -621,6 +779,15 @@ def _extract_tournament_name(url: str, title: str = "") -> str:
     if url in _TOURNAMENT_NAME_OVERRIDES:
         return _TOURNAMENT_NAME_OVERRIDES[url]
 
+    # Yearly "Regionalmeisterschaften" roundups cover several regional
+    # tournaments in one article (see _section_headings_by_blockquote,
+    # which names each entry after its specific region); this article-level
+    # name is only ever used as a fallback for an entry that couldn't be
+    # matched to a section, so it just needs to identify the roundup, not
+    # any one region.
+    if re.search(r"Regionalmeisterschaften?", title or url, re.IGNORECASE):
+        return "Regios"
+
     if title:
         out = title
     else:
@@ -628,7 +795,7 @@ def _extract_tournament_name(url: str, title: str = "") -> str:
         out = out.replace("-", " ").title()
 
     pattern_start = re.compile(
-        r"(?:gewinnt|gewinnen|siegreich|wins|triumphieren|triumphiert?)[- ](?:beim|den|die|das|dem|des|der|einen?|eine[mnrs]?|d[iea]|de[mnrs]?|the)?\s*(.+)$",
+        r"(?:gewinnt|gewinnen|siegreich|wins|triumphieren|triumphiert|Sieger|siegt?)[- ](?:beim|den|die|das|dem|des|der|einen?|eine[mnrs]?|d[iea]|de[mnrs]?|the)?\s*(.+)$",
         re.IGNORECASE,
     )
 
@@ -637,7 +804,9 @@ def _extract_tournament_name(url: str, title: str = "") -> str:
         out = match.group(1)
 
     for large_description, replacement in _TOURNAMENT_TITLE_REPLACEMENTS.items():
-        out = re.sub(re.escape(large_description), replacement, out, flags=re.IGNORECASE)
+        out = re.sub(
+            re.escape(large_description), replacement, out, flags=re.IGNORECASE
+        )
 
     daten_und_ergebnisse_match = re.match(
         r"^(?:Die\s+)?(.+?)\s+Daten\s+Und\s+Ergebnisse$", out, re.IGNORECASE
@@ -666,6 +835,15 @@ def _extract_tournament_name(url: str, title: str = "") -> str:
     )
 
     out = re.sub(pattern_end, "", out).strip()
+
+    # A year is never actually part of the tournament's name in any article
+    # we've seen - it's already tracked separately in the "Datum" column -
+    # so drop it and everything that follows it (e.g. "... 2013: Übersicht
+    # Vorrunden und Break" -> "...").
+    out = _YEAR_CUTOFF_RE.sub("", out).strip()
+
+    # Remove characters not belonging in the Title
+    out = re.sub("[:–,„“]", "", out)
 
     return out
 
