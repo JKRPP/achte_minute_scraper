@@ -175,7 +175,7 @@ def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
         (r"\bshould\b", "Sollten wir/Sollte x...?"),
         (
             r"\bverpflichtung\b|\bmoralisch richtig\b|\bmoralische\s+pflicht\b|\bmoralisch\s+gerechtfertigt\b",
-            "Ist x moralisch?",
+            "Ist x (un-) moralisch?",
         ),
         (
             r"\bzu\s+begrüßen\b|\bbegrüßenswert\b|\bwünschenswert\w*\b",
@@ -194,13 +194,13 @@ def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
             "Ist x zu bevorzugen?",
         ),
         (r"\b(?:wäre|ist)\b.*\b(?:gut|schlecht)\b", "Ist x gut/schlecht?"),
-        (r"\bunmoralisch\b|\bmoralisch\s+falsch\b", "Ist x moralisch gerechtfertigt?"),
+        (r"\bunmoralisch\b|\bmoralisch\s+falsch\b", "Ist x (un-) moralisch?"),
         (
             r"\b(?:bedauern|bedauert|bereuen|bereut|bedauernswert|begrüßenswert|bedauerlich|begrüßenswerte)\b",
             "Ist x zu bereuen/bedauern?",
         ),
         (r"\b(?:verboten|abgeschaff?t|eingeführt)\b", "Sollten wir...?"),
-        (r"\bdoes\b.*\b(?:have|be)\b", "Ist x moralisch gerechtfertigt?"),
+        (r"\bdoes\b.*\b(?:have|be)\b", "Ist x (un-) moralisch?"),
         (r"mehr geschadet,? als", "Schadet x mehr als es nutzt?"),
         (r"schadet.*mehr als", "Schadet x mehr als es nutzt?"),
         (
