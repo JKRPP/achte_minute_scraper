@@ -59,6 +59,13 @@ _TURNIERE_CATEGORY_ID = 46
 with open(_DATA_DIR / "tournament_title_replacements.json", "r", encoding="utf-8") as f:
     _TOURNAMENT_TITLE_REPLACEMENTS = json.load(f)
 
+# Manual overrides for articles whose headline phrasing doesn't fit any
+# general pattern (e.g. "X, Y und Z sind die Sieger der ..."). Keyed by the
+# full article URL, since the phrasing that defeats the heuristic is
+# specific to that one headline rather than a reusable pattern.
+with open(_DATA_DIR / "tournament_name_overrides.json", "r", encoding="utf-8") as f:
+    _TOURNAMENT_NAME_OVERRIDES = json.load(f)
+
 with open(_DATA_DIR / "round_translations.json", "r", encoding="utf-8") as f:
     _ROUND_TRANSLATIONS = json.load(f)
 
@@ -460,6 +467,16 @@ def _extract_article_body(full_soup: BeautifulSoup) -> BeautifulSoup:
     return trimmed
 
 
+def _extract_title(soup: BeautifulSoup) -> str:
+    """
+    Gets the article's headline (the first <h2> in the trimmed article
+    body), which retains real casing, umlauts and punctuation - unlike the
+    URL slug, which is ASCII-folded and hyphen-joined.
+    """
+    heading = soup.find("h2")
+    return _normalize_whitespace(heading.get_text()) if heading else ""
+
+
 def download_article(url: str, overwrite=False):
     file_path = ARTICLE_DIR / (
         url.removeprefix("https://www.achteminute.de/")
@@ -541,7 +558,7 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
             if entry:
                 entries.append(entry)
 
-    tournament_name = _extract_tournament_name(url)
+    tournament_name = _extract_tournament_name(url, _extract_title(soup))
 
     for entry in entries:
         entry["Link"] = url
@@ -593,12 +610,23 @@ def _extract_format_from_topic(topic: str) -> str:
     return "unbekannt"
 
 
-def _extract_tournament_name(url: str) -> str:
+def _extract_tournament_name(url: str, title: str = "") -> str:
     """
-    Gets an URL and extracts the clear name of the tournament. Does not work if the tournament name is not part of the url.
+    Extracts the clear name of the tournament from an article's headline
+    (falling back to the URL slug if no headline was available, e.g. for
+    stale cached articles). Explicit per-URL overrides take precedence,
+    since some headlines phrase the result in ways too varied to
+    generalize into a regex (see tournament_name_overrides.json).
     """
-    out = url.removeprefix("https://www.achteminute.de/")
-    out = out.split("/")[1]
+    if url in _TOURNAMENT_NAME_OVERRIDES:
+        return _TOURNAMENT_NAME_OVERRIDES[url]
+
+    if title:
+        out = title
+    else:
+        out = url.removeprefix("https://www.achteminute.de/").split("/")[1]
+        out = out.replace("-", " ").title()
+
     pattern_start = re.compile(
         r"(?:gewinnt|gewinnen|siegreich|wins|triumphieren|triumphiert?)[- ](?:beim|den|die|das|dem|des|der|einen?|eine[mnrs]?|d[iea]|de[mnrs]?|the)?\s*(.+)$",
         re.IGNORECASE,
@@ -608,13 +636,8 @@ def _extract_tournament_name(url: str) -> str:
     if match:
         out = match.group(1)
 
-    out = out.replace("-", " ")
-    out = out.title()
-
-    for large_description in _TOURNAMENT_TITLE_REPLACEMENTS.keys():
-        out = out.replace(
-            large_description, _TOURNAMENT_TITLE_REPLACEMENTS[large_description]
-        )
+    for large_description, replacement in _TOURNAMENT_TITLE_REPLACEMENTS.items():
+        out = re.sub(re.escape(large_description), replacement, out, flags=re.IGNORECASE)
 
     daten_und_ergebnisse_match = re.match(
         r"^(?:Die\s+)?(.+?)\s+Daten\s+Und\s+Ergebnisse$", out, re.IGNORECASE
@@ -632,7 +655,7 @@ def _extract_tournament_name(url: str) -> str:
     out = re.sub(break_suffix_re, "", out).strip()
 
     overview_suffix_re = re.compile(
-        r"\s+(?:Der|Die)\s+(?:Ergebnisse|U(?:e|ü)?berblick|U(?:e|ü)?bersicht)(?:\s+Des\s+.+)?\s*$",
+        r"\s+(?:Der|Die|Im)?\s*(?:Ergebnisse|U(?:e|ü)?berblick|U(?:e|ü)?bersicht)(?:\s+Des\s+.+)?\s*$",
         re.IGNORECASE,
     )
     out = re.sub(overview_suffix_re, "", out).strip()
