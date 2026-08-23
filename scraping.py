@@ -23,14 +23,6 @@ _QUOTE_CHARS = "\"'„“”‚‘’«»"
 
 _LABEL_WORD_RE = re.compile(r"^([A-Za-zÀ-ÿ]+)\s*:?\s*")
 _LABEL_STEMS = ("info", "fact", "definition", "beispiel")
-# A segment "looks like a topic" if it ends in a question (OPD-style) or
-# opens with a known motion phrasing (BP-style) - used to tell a round's
-# real topic apart from trailing narrative prose in "story" articles (see
-# _finalize_round).
-_TOPIC_LIKE_RE = re.compile(
-    r"\?\s*$|^(?:DH|Dieses Haus|Diese Haus|This house|TH)\b|^(?:Sollte|Soll|Sollten|Ist|Würdest)\b",
-    re.IGNORECASE,
-)
 _DATE_IN_URL_RE = re.compile(r"/(\d{8})/")
 # Matches a year and everything after it in an extracted tournament name -
 # it's already tracked separately in the "Datum" column, and whatever
@@ -75,6 +67,35 @@ _TURNIERE_CATEGORY_ID = 46
 
 with open(_DATA_DIR / "tournament_title_replacements.json", "r", encoding="utf-8") as f:
     _TOURNAMENT_TITLE_REPLACEMENTS = json.load(f)
+
+# Known BP motion-opener abbreviations (e.g. "DHG" for "Dieses Haus
+# glaubt"), reused from motion_type_abbreviations.json so the format
+# detector in _extract_format_from_topic recognizes exactly the same set
+# topic_merger.py already knows how to expand - rather than a bare "DH"/
+# "TH" that would also match as a false-positive substring inside an
+# unrelated word (e.g. "TH" inside "The").
+with open(_DATA_DIR / "motion_type_abbreviations.json", "r", encoding="utf-8") as f:
+    _MOTION_TYPE_ABBREVIATIONS = json.load(f)
+_BP_ABBREVIATIONS = sorted(
+    {
+        abbr.strip(" ,.")
+        for lang_abbrs in _MOTION_TYPE_ABBREVIATIONS.values()
+        for abbr in lang_abbrs
+    },
+    key=len,
+    reverse=True,
+)
+_BP_OPENER_RE = "|".join(re.escape(abbr) for abbr in _BP_ABBREVIATIONS)
+
+# A segment "looks like a topic" if it ends in a question (OPD-style) or
+# opens with a known motion phrasing (BP-style) - used to tell a round's
+# real topic apart from trailing narrative prose in "story" articles (see
+# _finalize_round).
+_TOPIC_LIKE_RE = re.compile(
+    rf"\?\s*$|^(?:{_BP_OPENER_RE}|Dieses Haus|Diese Haus|This house)\b"
+    r"|^(?:Sollte|Soll|Sollten|Ist|Würdest)\b",
+    re.IGNORECASE,
+)
 
 # Common typos (e.g. "Diese Haus" -> "Dieses Haus") found in topics/
 # factsheets, corrected before format/language detection so they aren't
@@ -816,18 +837,32 @@ def _detect_language(input: str) -> str:
 def _extract_format_from_topic(topic: str) -> str:
     """
     Classifies a topic into either BP or OPD based on its topic string.
-    """
-    if "?" in topic:
-        return "OPD"
 
+    Checked before the "?" -> OPD check below, since a BP motion can carry
+    a rhetorical/flavor-text question before its actual "Dieses Haus..."
+    clause (e.g. "The West is the best? Dieses Haus würde...").
+    """
     topic_to_match = topic.strip().replace('"', "")
 
-    bp_pattern = r"(DH|Dieses Haus|Diese Haus|This house|TH)"
+    # Word-bounded, and restricted to the known DH.../TH... abbreviations
+    # (see _BP_ABBREVIATIONS), so this only matches an actual abbreviated
+    # motion opener - not a bare "TH"/"DH" substring inside an unrelated
+    # word (e.g. "TH" inside a quoted English phrase like „For The Plot"),
+    # while still matching a suffixed form like "DHG" or "THW".
+    bp_pattern = rf"\b(?:{_BP_OPENER_RE}|Dieses Haus|Diese Haus|This house)\b"
     if re.search(bp_pattern, topic_to_match, re.IGNORECASE):
         return "BP"
 
-    opd_pattern = r"^(Sollte|Soll|Sollten|Ist|Würdest)\b"
-    if re.match(opd_pattern, topic_to_match, re.IGNORECASE):
+    if "?" in topic:
+        return "OPD"
+
+    # Only matched at the very start, or right after a sentence-ending
+    # punctuation mark, so a leading flavor-text clause (e.g. "In eurem
+    # Leben hat sich ... verändert (...): Sollte man ...") doesn't hide the
+    # real motion opener - but common words like "Ist" still can't match
+    # arbitrarily mid-sentence, which an unanchored search would allow.
+    opd_pattern = r"(?:^|[:.!?]\s*)(?:Sollte|Soll|Sollten|Ist|Würdest)\b"
+    if re.search(opd_pattern, topic_to_match, re.IGNORECASE):
         return "OPD"
 
     return "unbekannt"

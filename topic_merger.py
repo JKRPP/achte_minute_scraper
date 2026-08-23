@@ -140,8 +140,11 @@ def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
         (r"Dieses Haus glaubt.*sollte", "Dieses Haus glaubt, X sollte..."),
         (r"Dieses Haus (?:würde|verbietet|hätte)", "Dieses Haus würde..."),
         (r"(?:Würde|Erlaubt) dieses Haus", "Dieses Haus würde..."),
-        (r"Dieses Haus,?\s*[-–—]?\s*(?:als|welches.*ist)", "Dieses Haus als..."),
-        (r"Dieses Haus glaubt", "Dieses Haus glaubt..."),
+        (
+            r"Dieses Haus,?\s*[-–—]?\s*\(?\s*(?:als|welches.*ist)\s*\)?",
+            "Dieses Haus als...",
+        ),
+        (r"Dieses Haus (?:glaubt|hält|ist)", "Dieses Haus glaubt..."),
         (r"Dieses Haus bereut", "Dieses Haus bereut..."),
         (r"Dieses Haus (?:bedauert|verurteilt|hasst)", "Dieses Haus bedauert..."),
         (r"Dieses Haus lehnt.*ab", "Dieses Haus bedauert..."),
@@ -171,14 +174,15 @@ def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
             r"\bist(?:\s+es)?\b.*\bzu\s+(?:bereuen|bedauern)\b",
             "Ist x zu bereuen/bedauern?",
         ),
-        (r"\bim\s+interesse\b", "Ist x im Interesse von y?"),
+        (r"\bWäre eine Welt\b", "Wäre eine Welt...?"),
+        (r"\b(?:im\s+interesse|im Sinne des)\b", "Ist x im Interesse von y?"),
         (r"\bin the interest\b", "Ist x in Interesse von y?"),
         (r"\bhätten?\b.*\btun\s+sollen\b", "Hätte x y tun sollen?"),
         (r"\bsoll(?:en|test|te|ten)?\b", "Sollten wir/Sollte x...?"),
         (r"\bbrauchen\s+wir\b", "Brauchen wir..?"),
         (r"\bshould\b", "Sollten wir/Sollte x...?"),
         (
-            r"\bverpflichtung\b|\bmoralisch richtig\|\blegitimes mittel\b|\bmoralische\s+pflicht\b|\bmoralisch\s+gerechtfertigt\b",
+            r"\bverpflichtung\b|\bmoralisch richtig\b|\blegitimes mittel\b|\bmoralische\s+pflicht\b|\bmoralisch\s+gerechtfertigt\b",
             "Ist x (un-) moralisch?",
         ),
         (
@@ -195,10 +199,14 @@ def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
             "Ist x zu bevorzugen?",
         ),
         (
-            r"(?:ist|wäre) es besser",
+            r"(?:ist|wäre) es.* besser",
             "Ist x zu bevorzugen?",
         ),
-        (r"\b(?:wäre|ist|sind)\b.*\b(?:gut|schlecht)\b", "Ist x gut/schlecht?"),
+        (r"\bsollte man.*\banstelle\b", "Ist x zu bevorzugen?"),
+        (
+            r"\b(?:wäre|ist|sind)\b.*\b(?:gut|schlechte?|gescheitert|schädigend|sinnvoller Beitrag|hilfreich)\b",
+            "Ist x gut/schlecht?",
+        ),
         (r"\bunmoralisch\b|\bmoralisch\s+falsch\b", "Ist x (un-) moralisch?"),
         (
             r"\b(?:bedauern|bedauert|bereuen|bereut|bedauernswert|begrüßenswert|bedauerlich|begrüßenswerte)\b",
