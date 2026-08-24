@@ -118,7 +118,10 @@ with open(_DATA_DIR / "tournament_name_overrides.json", "r", encoding="utf-8") a
 # Debattiermeisterschaft" abbreviates to "NODM").
 _DIRECTION_INITIALS = {"nord": "N", "ost": "O", "süd": "S", "sued": "S", "west": "W"}
 _REGION_MEISTERSCHAFT_RE = re.compile(
-    r"^((?:nord|ost|süd|sued|west)+)deutsche\s+(?:Debattier)?[Mm]eisterschaft$",
+    # Not anchored at the end - a section heading often trails the region
+    # name with a host city (e.g. "Süddeutsche Debattiermeisterschaft,
+    # Tübingen"), which isn't part of the name itself.
+    r"^((?:nord|ost|süd|sued|west)+)deutsche\s+(?:Debattier)?[Mm]eisterschaft\b",
     re.IGNORECASE,
 )
 # A regional championship's abbreviation is always its compass initials
@@ -473,7 +476,11 @@ def _finalize_round(round_label: str, content: List[str]) -> Optional[Dict[str, 
         # Nothing scanned looked like a topic (shouldn't normally happen) -
         # fall back to the previous behavior of just using the last
         # non-excluded segment, rather than dropping every candidate.
-        topic_index = fallback_topic_index if fallback_topic_index is not None else len(content) - 1
+        topic_index = (
+            fallback_topic_index
+            if fallback_topic_index is not None
+            else len(content) - 1
+        )
         dropped_indices.discard(topic_index)
 
     topic = content[topic_index]
@@ -681,6 +688,19 @@ def _section_headings_by_blockquote(soup: BeautifulSoup) -> Dict[int, str]:
     return sections
 
 
+def _parenthesized_region_abbreviation(text: str) -> Optional[str]:
+    """
+    Finds a regional championship's abbreviation when it's already spelled
+    out in parentheses somewhere in text (e.g. "Nordostdeutsche
+    Meisterschaft (NODM), Jena" or "Westdeutsche Meisterschaft (WDM),
+    Bonn"), regardless of what surrounds it.
+    """
+    match = re.search(r"\(([A-ZÄÖÜ]{2,4})\)", text)
+    if match and _REGION_ABBREVIATION_RE.match(match.group(1)):
+        return match.group(1)
+    return None
+
+
 def _abbreviate_region_name(name: str) -> Optional[str]:
     """
     Abbreviates a regional championship's name (e.g. "Nordostdeutsche
@@ -689,6 +709,10 @@ def _abbreviate_region_name(name: str) -> Optional[str]:
     (e.g. a host city or a one-off tournament name).
     """
     name = name.strip()
+
+    parenthesized = _parenthesized_region_abbreviation(name)
+    if parenthesized:
+        return parenthesized
 
     if _REGION_ABBREVIATION_RE.match(name.upper()):
         return name.upper()
@@ -727,7 +751,7 @@ def _tournament_name_for_section(section: str) -> str:
     if abbreviation:
         return abbreviation
 
-    return f"Regionalmeisterschaft {section}"
+    return section
 
 
 def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
@@ -879,6 +903,14 @@ def _extract_tournament_name(url: str, title: str = "") -> str:
     if url in _TOURNAMENT_NAME_OVERRIDES:
         return _TOURNAMENT_NAME_OVERRIDES[url]
 
+    # A title that already spells out its own abbreviation in parentheses
+    # (e.g. "Nordostdeutsche Meisterschaft (NODM)" or "Westdeutsche
+    # Meisterschaft (WDM), Bonn") tells us exactly what to call it - no
+    # need to run the general heuristics below at all.
+    parenthesized = _parenthesized_region_abbreviation(title or "")
+    if parenthesized:
+        return parenthesized
+
     # Yearly "Regionalmeisterschaften" roundups cover several regional
     # tournaments in one article (see _section_headings_by_blockquote,
     # which names each entry after its specific region); this article-level
@@ -944,6 +976,11 @@ def _extract_tournament_name(url: str, title: str = "") -> str:
 
     # Remove characters not belonging in the Title
     out = re.sub("[:–,„“]", "", out)
+
+    # A leading definite article isn't part of the tournament's name either
+    # (e.g. "Der Bodden-Cup" -> "Bodden-Cup", "Das Frauenturnier" ->
+    # "Frauenturnier").
+    out = re.sub(r"^(?:Der|Die|Das)\s+", "", out, flags=re.IGNORECASE).strip()
 
     return out
 
