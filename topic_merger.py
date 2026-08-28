@@ -181,6 +181,7 @@ def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
         (r"\bhätten?\b.*\btun\s+sollen\b", "Hätte x y tun sollen?"),
         (r"\bsoll(?:en|test|te|ten)?\b", "Sollten wir/Sollte x...?"),
         (r"\bbrauchen\s+wir\b", "Brauchen wir..?"),
+        (r"\bbraucht\s", "Brauchen wir..?"),
         (r"\bshould\b", "Sollten wir/Sollte x...?"),
         (
             r"\bverpflichtung\b|\bmoralisch richtig\b|\blegitimes mittel\b|\bmoralische\s+pflicht\b|\bmoralisch\s+gerechtfertigt\b",
@@ -242,7 +243,7 @@ def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
     return out_df
 
 
-def build_topics_csv() -> pd.DataFrame:
+def build_topics_csv(include_old=False) -> pd.DataFrame:
     """
     Merges the per-year cache CSVs, cleans the result, and writes both
     `topics.csv` (the cleaned dataset the site is built from) and
@@ -251,9 +252,13 @@ def build_topics_csv() -> pd.DataFrame:
     merged_df = merge_csv_files_with_dedup(dedup_column="Thema", verify_column="Link")
     cleaned_df = clean_df(merged_df)
     cleaned_df = classify_motion_types(cleaned_df)
+    if include_old:
+        old_topic_path = os.path.join(_DATA_DIR, "old_topics.json")
+        old_df = pd.read_json(old_topic_path)
+        cleaned_df = pd.concat([cleaned_df, old_df], ignore_index=True)
+        cleaned_df = cleaned_df.sort_values(by="Datum").reset_index(drop=True)
     print(f"Writing {len(cleaned_df)} topics to csv.")
     cleaned_df.to_csv(OUTPUT_DIR / "topics.csv", index=False)
-    merged_df.to_csv(CACHE_DIR / "topics_full.csv", index=False)
     return cleaned_df
 
 
