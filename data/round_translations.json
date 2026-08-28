@@ -124,5 +124,19 @@
   "Vorrunde 3": "VR3",
   "Vorrunde 4": "VR4",
   "Vorrunde 5": "VR5",
-  "Vr5": "VR5"
+  "Vr5": "VR5",
+  "1": "VR1",
+  "2": "VR2",
+  "3": "VR3",
+  "4": "VR4",
+  "5": "VR5",
+  "6": "VR6",
+  "7": "VR7",
+  "8": "VR8",
+  "9": "VR9",
+  "Vorrunde": "VR",
+  "KO": "Halbfinale",
+  "KO1": "Viertelfinale",
+  "KO2": "Halbfinale"
+
 }
