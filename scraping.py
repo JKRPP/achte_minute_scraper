@@ -159,6 +159,33 @@ def _is_known_round_label(label: str) -> bool:
     return bool(prefix_match and prefix_match.group(1) in _KNOWN_ROUND_PREFIXES)
 
 
+_EMBEDDED_ROUND_LABEL_RE = re.compile(
+    r"(?:^|(?<=\s))\(?((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß\-]*\s?){1,4}[0-9]{0,3})(?:\s*\([^)]*\))?:(?![a-zäöüß])"
+)
+
+
+def _split_multi_round_segment(segment: str) -> List[str]:
+    """
+    Splits a segment holding several "Runde N: ..." entries glued together
+    by a single <br> (rather than the blank-line-style double <br> that
+    normally separates segments - see _blockquote_segments) into one
+    segment per round.
+    """
+    matches = [
+        m
+        for m in _EMBEDDED_ROUND_LABEL_RE.finditer(segment)
+        if _is_known_round_label(m.group(1))
+    ]
+    if len(matches) <= 1:
+        return [segment]
+
+    pieces = []
+    for i, match in enumerate(matches):
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(segment)
+        pieces.append(segment[match.start() : end].strip())
+    return pieces
+
+
 def _match_round_label(segment: str):
     """
     Matches a round-label line, peeling off an unrecognized leading label
@@ -315,18 +342,18 @@ def _blockquote_segments(blockquote) -> List[str]:
             elif descendant.name == "br":
                 br_run += 1
                 if br_run >= 2 and current.strip():
-                    segments.append(current.strip())
+                    segments.extend(_split_multi_round_segment(current.strip()))
                     current = ""
                     current_is_strong_only = True
             elif descendant.name in ("strong", "b"):
                 # Split on a new highlighted spot
                 if current.strip() and not current_is_strong_only:
-                    segments.append(current.strip())
+                    segments.extend(_split_multi_round_segment(current.strip()))
                     current = ""
                     current_is_strong_only = True
                 br_run = 0
         if current.strip():
-            segments.append(current.strip())
+            segments.extend(_split_multi_round_segment(current.strip()))
     return segments
 
 
