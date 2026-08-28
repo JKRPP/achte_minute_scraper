@@ -157,16 +157,17 @@ def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
             r"Dieses Haus (?:bevorzugt|präferiert|zieht|entscheidet sich)",
             "Dieses Haus bevorzugt...",
         ),
-        (r"This house believes.*should", "Dieses Haus glaubt, X sollte..."),
-        (r"This house would", "Dieses Haus würde..."),
-        (r"This house,?\s*[-–—]?\s*as", "Dieses Haus als..."),
-        (r"This house believes", "Dieses Haus glaubt..."),
+        (r"(?:This house believes|THBT).*should", "Dieses Haus glaubt, X sollte..."),
+        (r"This house (?:will|would)", "Dieses Haus würde..."),
+        (r"This house,?\s*[-–—]?\s*\(?\s*as", "Dieses Haus als..."),
+        (r"(?:This house believes|THBT)", "Dieses Haus glaubt..."),
         (r"This house opposes", "Dieses Haus bedauert..."),
         (r"This house regrets", "Dieses Haus bereut..."),
         (r"This house supports", "Dieses haus begrüßt..."),
         (r"This house prefers", "Dieses Haus bevorzugt..."),
         (r"This house hopes", "Dieses Haus hofft..."),
         (r"This house predicts", "Dieses Haus sagt vorraus..."),
+        (r"THPAW", "Dieses Haus bevorzugt..."),
     ]
 
     opd_filtering_patterns = [

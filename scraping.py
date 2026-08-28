@@ -159,6 +159,26 @@ def _is_known_round_label(label: str) -> bool:
     return bool(prefix_match and prefix_match.group(1) in _KNOWN_ROUND_PREFIXES)
 
 
+def _match_round_label(segment: str):
+    """
+    Matches a round-label line, peeling off an unrecognized leading label
+    and retrying against what follows it. Needed for e.g. an inline
+    sub-tournament heading like "Regio Marburg:" that shares one <p> (and
+    therefore one segment) with the real round label right after it via a
+    <br> - without this, the whole segment (real label included) would be
+    rejected wholesale as belonging to the bogus "Regio Marburg" label.
+    """
+    match = _ROUND_LABEL_LINE_RE.match(segment)
+    while match:
+        label = match.group(1)
+        if any(word.startswith(_LABEL_STEMS) for word in label.lower().split()):
+            return None
+        if _is_known_round_label(label):
+            return match
+        match = _ROUND_LABEL_LINE_RE.match(match.group(2))
+    return None
+
+
 def _get(url: str) -> httpx.Response:
     """
     GETs a URL, retrying on transient connection failures (e.g. "Server
@@ -788,15 +808,7 @@ def extract_topics_from_article(url: str) -> List[Dict[str, str]]:
                 # Continue on decorative splitter
                 continue
 
-            label_match = _ROUND_LABEL_LINE_RE.match(segment)
-            if label_match and (
-                any(
-                    word.startswith(_LABEL_STEMS)
-                    for word in label_match.group(1).lower().split()
-                )
-                or not _is_known_round_label(label_match.group(1))
-            ):
-                label_match = None
+            label_match = _match_round_label(segment)
 
             if label_match:
                 if not any(_LINEUP_MARKER_RE.search(c) for c in current_content):
