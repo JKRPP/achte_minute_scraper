@@ -13,11 +13,17 @@ if __name__ == "__main__":
             "without fetching article/link lists over the network."
         ),
     )
+    parser.add_argument(
+        "--starting-year",
+        type=int,
+        default=2013,
+        help="First year to (re)generate topics for.",
+    )
     args = parser.parse_args()
 
     print("Manual regeneration of site triggered.")
     if args.from_cache:
         regenerate_topics_from_cache()
     else:
-        initial_generation(force_regenerate=True)
+        initial_generation(starting_year=args.starting_year, force_regenerate=True)
         regenerate_site()
