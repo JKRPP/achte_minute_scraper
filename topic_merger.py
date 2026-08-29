@@ -243,7 +243,7 @@ def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
     return out_df
 
 
-def build_topics_csv(include_old=False) -> pd.DataFrame:
+def build_topics_csv(include_old=True) -> pd.DataFrame:
     """
     Merges the per-year cache CSVs, cleans the result, and writes both
     `topics.csv` (the cleaned dataset the site is built from) and
