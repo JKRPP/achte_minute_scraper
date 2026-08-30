@@ -58,7 +58,10 @@ def regenerate_topics_from_cache():
         year = topics_file.stem.removeprefix("topics_")
         if year in years_with_link_file:
             continue
-        df = pd.read_csv(topics_file)
+        try:
+            df = pd.read_csv(topics_file)
+        except pd.errors.EmptyDataError:
+            continue
         if "Link" not in df.columns:
             continue
         links = df["Link"].dropna().unique().tolist()

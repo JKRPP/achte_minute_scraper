@@ -1,4 +1,5 @@
 import json
+import re
 import pandas as pd
 import glob
 import os
@@ -138,7 +139,10 @@ def standardize_df_motions(input_df: pd.DataFrame) -> pd.DataFrame:
 def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
     bp_filtering_patterns = [
         (r"Dieses Haus glaubt.*sollte", "Dieses Haus glaubt, X sollte..."),
-        (r"Dieses Haus (?:würde|verbietet|hätte)", "Dieses Haus würde..."),
+        (
+            r"Dieses Haus (?:würde|verbietet|hätte|fordert|verpflichtet|führt)",
+            "Dieses Haus würde...",
+        ),
         (r"(?:Würde|Erlaubt) dieses Haus", "Dieses Haus würde..."),
         (
             r"Dieses Haus,?\s*[-–—]?\s*\(?\s*(?:als|welches.*ist)\s*\)?",
@@ -243,7 +247,7 @@ def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
     return out_df
 
 
-def build_topics_csv(include_old=True) -> pd.DataFrame:
+def build_topics_csv(include_old_ddm=True, include_old_list=True) -> pd.DataFrame:
     """
     Merges the per-year cache CSVs, cleans the result, and writes both
     `topics.csv` (the cleaned dataset the site is built from) and
@@ -252,11 +256,18 @@ def build_topics_csv(include_old=True) -> pd.DataFrame:
     merged_df = merge_csv_files_with_dedup(dedup_column="Thema", verify_column="Link")
     cleaned_df = clean_df(merged_df)
     cleaned_df = classify_motion_types(cleaned_df)
-    if include_old:
+    if include_old_ddm:
+        old_ddm_path = os.path.join(_DATA_DIR, "old_ddm_topics.json")
+        old_ddm_df = pd.read_json(old_ddm_path)
+        cleaned_df = pd.concat([cleaned_df, old_ddm_df], ignore_index=True)
+        cleaned_df = cleaned_df.sort_values(by="Datum").reset_index(drop=True)
+        print(f"Appended {len(old_ddm_df)} old DDM topics!")
+    if include_old_list:
         old_topic_path = os.path.join(_DATA_DIR, "old_topics.json")
         old_df = pd.read_json(old_topic_path)
         cleaned_df = pd.concat([cleaned_df, old_df], ignore_index=True)
         cleaned_df = cleaned_df.sort_values(by="Datum").reset_index(drop=True)
+        print(f"Appended {len(old_df)} topics!")
     print(f"Writing {len(cleaned_df)} topics to csv.")
     cleaned_df.to_csv(OUTPUT_DIR / "topics.csv", index=False)
     return cleaned_df
