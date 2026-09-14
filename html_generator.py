@@ -771,6 +771,19 @@ TEMPLATE = """<!doctype html>
     cursor: pointer;
   }}
   .random-reveal-btn:hover {{ opacity: .9; }}
+  .modal button.random-hide-btn {{
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: .4rem .9rem;
+    font-size: .85rem;
+    cursor: pointer;
+    margin-top: .75rem;
+  }}
+  .modal button.random-hide-btn:hover {{ border-color: var(--accent); color: var(--accent); }}
+  .random-meta-row .random-hide-btn {{ margin-top: 0; }}
+  .random-modal.presentation-mode .random-hide-btn {{ display: none !important; }}
   .random-modal .random-no-infoslide {{
     color: var(--muted);
     font-size: 1.1rem;
@@ -805,9 +818,16 @@ TEMPLATE = """<!doctype html>
     justify-content: center;
     align-items: center;
     gap: .6rem;
-    margin-top: 2rem;
     color: var(--muted);
     font-size: .9rem;
+  }}
+  .random-meta-row {{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: .8rem;
+    margin-top: 2rem;
   }}
   .random-actions {{
     text-align: center;
@@ -823,6 +843,22 @@ TEMPLATE = """<!doctype html>
     cursor: pointer;
   }}
   .random-actions button:hover {{ border-color: var(--accent); color: var(--accent); }}
+  .random-auto-reveal {{
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    margin-left: 1rem;
+    font-size: .85rem;
+    color: var(--text);
+    cursor: pointer;
+    vertical-align: middle;
+  }}
+  .random-auto-reveal:hover {{ color: var(--accent); }}
+  .random-auto-reveal input {{
+    margin: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }}
   .modal-overlay.presentation-mode {{ padding: 0; background: var(--bg, #000); }}
   .random-modal.presentation-mode {{
     --presentation-margin-top: 3rem;
@@ -1036,13 +1072,20 @@ TEMPLATE = """<!doctype html>
           <button type="button" class="random-reveal-btn" id="randomTopicBtn">Thema anzeigen</button>
           <p class="random-topic-text" id="randomTopicText" style="display:none;"></p>
         </div>
-        <div class="random-meta" id="randomMeta"></div>
+        <div class="random-meta-row">
+          <div class="random-meta" id="randomMeta"></div>
+          <button type="button" class="random-hide-btn" id="randomTopicHideBtn" style="display:none;">Thema verbergen</button>
+        </div>
       </div>
       <div class="random-actions">
         <button type="button" id="randomCopyBtn">Motion kopieren</button>
         <button type="button" id="randomCopyLinkBtn">Link kopieren</button>
         <button type="button" id="randomPresentBtn">Präsentationsmodus</button>
         <button type="button" id="randomAgainBtn">Zufällige Motion</button>
+        <label class="random-auto-reveal">
+          <input type="checkbox" id="randomAutoRevealToggle">
+          Automatisch aufdecken
+        </label>
       </div>
     </div>
   </div>
@@ -1535,6 +1578,7 @@ const randomNoInfoslide = document.getElementById('randomNoInfoslide');
 const randomInfoslideText = document.getElementById('randomInfoslideText');
 const randomTopicBtn = document.getElementById('randomTopicBtn');
 const randomTopicText = document.getElementById('randomTopicText');
+const randomTopicHideBtn = document.getElementById('randomTopicHideBtn');
 const randomMeta = document.getElementById('randomMeta');
 const randomAgainBtn = document.getElementById('randomAgainBtn');
 const randomCopyBtn = document.getElementById('randomCopyBtn');
@@ -1542,12 +1586,19 @@ const randomCopyLinkBtn = document.getElementById('randomCopyLinkBtn');
 const randomPresentBtn = document.getElementById('randomPresentBtn');
 const randomRevealStack = document.querySelector('.random-reveal-stack');
 const randomActionsEl = document.querySelector('.random-actions');
+const randomAutoRevealToggle = document.getElementById('randomAutoRevealToggle');
 
 let randomMotion = null;
 let randomInfoslideRevealed = false;
 let randomTopicRevealed = false;
 let presentationMode = false;
 let topicRevealedAt = null;
+let autoReveal = localStorage.getItem('randomAutoReveal') === '1';
+randomAutoRevealToggle.checked = autoReveal;
+randomAutoRevealToggle.addEventListener('change', () => {{
+  autoReveal = randomAutoRevealToggle.checked;
+  localStorage.setItem('randomAutoReveal', autoReveal ? '1' : '0');
+}});
 
 function renderRandomMotion() {{
   if (!randomMotion) return;
@@ -1571,6 +1622,7 @@ function renderRandomMotion() {{
   randomTopicText.style.display = randomTopicRevealed ? 'block' : 'none';
   randomTopicText.textContent = randomMotion.Thema ?? '';
   randomTopicText.classList.toggle('long-text', (randomMotion.Thema ?? '').toString().length > LONG_TEXT_THRESHOLD);
+  randomTopicHideBtn.style.display = randomTopicRevealed ? 'block' : 'none';
 
   randomMeta.style.display = randomTopicRevealed ? 'flex' : 'none';
   randomMeta.innerHTML = randomTopicRevealed ? `
@@ -1642,9 +1694,9 @@ function pickRandomMotion() {{
   const hadNothingRevealed = !randomInfoslideRevealed && !randomTopicRevealed;
 
   randomMotion = pool[Math.floor(Math.random() * pool.length)];
-  randomInfoslideRevealed = false;
-  randomTopicRevealed = false;
-  topicRevealedAt = null;
+  randomInfoslideRevealed = autoReveal;
+  randomTopicRevealed = autoReveal;
+  topicRevealedAt = autoReveal ? new Date() : null;
   renderRandomMotion();
   setMotionQueryParam(randomMotion.Id);
 
@@ -1702,10 +1754,19 @@ randomTopicBtn.addEventListener('click', () => {{
   topicRevealedAt = new Date();
   renderRandomMotion();
 }});
+randomTopicHideBtn.addEventListener('click', () => {{
+  randomTopicRevealed = false;
+  randomInfoslideRevealed = false;
+  topicRevealedAt = null;
+  renderRandomMotion();
+}});
 randomAgainBtn.addEventListener('click', () => pickRandomMotion());
 randomPresentBtn.addEventListener('click', () => {{
   if (!randomMotion) return;
   presentationMode = true;
+  randomInfoslideRevealed = false;
+  randomTopicRevealed = false;
+  topicRevealedAt = null;
   renderRandomMotion();
 }});
 randomCopyBtn.addEventListener('click', () => {{
