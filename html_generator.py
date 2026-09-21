@@ -172,7 +172,7 @@ TEMPLATE = """<!doctype html>
     width: 1rem;
     height: 1rem;
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: 0px;
     background: var(--card);
     cursor: pointer;
     display: inline-grid;
@@ -202,7 +202,7 @@ TEMPLATE = """<!doctype html>
     background: var(--card);
     border: 1px solid var(--border);
     color: var(--text);
-    border-radius: 8px;
+    border-radius: 0px;
     padding: .55rem .75rem;
     font-size: .9rem;
     outline: none;
@@ -226,7 +226,7 @@ TEMPLATE = """<!doctype html>
     background: var(--card);
     border: 1px solid var(--border);
     color: var(--text);
-    border-radius: 8px;
+    border-radius: 0px;
     padding: .55rem .9rem;
     font-size: .9rem;
     cursor: pointer;
@@ -241,7 +241,7 @@ TEMPLATE = """<!doctype html>
     min-width: 1.2rem;
     height: 1.2rem;
     padding: 0 .3rem;
-    border-radius: 999px;
+    border-radius: 0px;
     background: var(--accent);
     color: var(--on-accent);
     font-size: .7rem;
@@ -255,7 +255,7 @@ TEMPLATE = """<!doctype html>
     padding: .75rem;
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 0px;
   }}
   .filter-panel.open {{ display: flex; }}
   .filter-field {{
@@ -291,7 +291,7 @@ TEMPLATE = """<!doctype html>
     overflow-y: auto;
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 0px;
     padding: .5rem;
     box-shadow: 0 4px 16px rgba(0, 0, 0, .15);
     z-index: 5;
@@ -366,7 +366,7 @@ TEMPLATE = """<!doctype html>
     left: 0;
     right: 0;
     height: 4px;
-    border-radius: 999px;
+    border-radius: 0px;
   }}
   .range-slider-track {{ background: var(--border); }}
   .range-slider-fill {{ background: var(--accent); }}
@@ -453,7 +453,7 @@ TEMPLATE = """<!doctype html>
     background: var(--card);
     border: 1px solid var(--border);
     color: var(--text);
-    border-radius: 8px;
+    border-radius: 0px;
     padding: .5rem .9rem;
     font-size: .85rem;
     cursor: pointer;
@@ -474,7 +474,7 @@ TEMPLATE = """<!doctype html>
     background: var(--card);
     border: 1px solid var(--border);
     color: var(--text);
-    border-radius: 6px;
+    border-radius: 0px;
     padding: .3rem .3rem;
     font-size: .85rem;
     -moz-appearance: textfield;
@@ -495,7 +495,7 @@ TEMPLATE = """<!doctype html>
   .card {{
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 0px;
     overflow: hidden;
   }}
   table {{
@@ -584,7 +584,7 @@ TEMPLATE = """<!doctype html>
     display: inline-block;
     background: var(--accent-weak);
     color: var(--accent);
-    border-radius: 999px;
+    border-radius: 0px;
     padding: .1rem .6rem;
     font-size: .75rem;
     font-weight: 600;
@@ -689,7 +689,7 @@ TEMPLATE = """<!doctype html>
   .modal {{
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 0px;
     max-width: 420px;
     width: 100%;
     padding: 1.5rem;
@@ -708,7 +708,7 @@ TEMPLATE = """<!doctype html>
     background: var(--accent);
     color: var(--on-accent);
     border: none;
-    border-radius: 8px;
+    border-radius: 0px;
     padding: .5rem 1rem;
     font-size: .85rem;
     cursor: pointer;
@@ -765,7 +765,7 @@ TEMPLATE = """<!doctype html>
     background: var(--accent);
     color: var(--on-accent);
     border: none;
-    border-radius: 10px;
+    border-radius: 0px;
     padding: 1rem 1.75rem;
     font-size: 1.1rem;
     cursor: pointer;
@@ -775,7 +775,7 @@ TEMPLATE = """<!doctype html>
     background: var(--card);
     border: 1px solid var(--border);
     color: var(--text);
-    border-radius: 8px;
+    border-radius: 0px;
     padding: .4rem .9rem;
     font-size: .85rem;
     cursor: pointer;
@@ -837,7 +837,7 @@ TEMPLATE = """<!doctype html>
     background: var(--card);
     border: 1px solid var(--border);
     color: var(--text);
-    border-radius: 8px;
+    border-radius: 0px;
     padding: .6rem 1.2rem;
     font-size: .9rem;
     cursor: pointer;
