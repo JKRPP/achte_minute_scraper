@@ -604,6 +604,12 @@ TEMPLATE = """<!doctype html>
     white-space: nowrap;
   }}
   @media (orientation: portrait) {{
+    main > .card {{
+      margin-left: -1.5rem;
+      margin-right: -1.5rem;
+      border-left: none;
+      border-right: none;
+    }}
     th.col-thema, th.col-factsheet {{ width: 50%; }}
     th.col-meta, th.col-link,
     td.col-meta, td.col-link {{
