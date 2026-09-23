@@ -100,8 +100,8 @@ TEMPLATE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root {{
-    --bg: #f7f7f7;
-    --card: #fdfdfd;
+    --bg: #ffffff;
+    --card: #ffffff;
     --text: #1c1c1c;
     --muted: #707070;
     --border: #e6e6e6;
@@ -114,9 +114,9 @@ TEMPLATE = """<!doctype html>
   }}
   @media (prefers-color-scheme: dark) {{
     :root {{
-      --bg: #0f0f0f;
-      --card: #181818;
-      --text: #e9e9e9;
+      --bg: #000000;
+      --card: #101112;
+      --text: #ffffff;
       --muted: #a1a1a1;
       --border: #2d2d2d;
       --accent: #129f33;
