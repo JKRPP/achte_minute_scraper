@@ -241,7 +241,7 @@ TEMPLATE = """<!doctype html>
     min-width: 1.2rem;
     height: 1.2rem;
     padding: 0 .3rem;
-    border-radius: 0px;
+    border-radius: 999px;
     background: var(--accent);
     color: var(--on-accent);
     font-size: .7rem;
