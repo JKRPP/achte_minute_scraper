@@ -1,11 +1,12 @@
-from datetime import datetime, time
-from html_generator import generate_html
-from scraping import extract_topics_for_links, get_all_article_links
-import os
 import json
+import os
+from datetime import datetime
+
 import pandas as pd
 
+from html_generator import generate_html
 from paths import CACHE_DIR, OUTPUT_DIR
+from scraping import extract_topics_for_links, get_all_article_links
 from topic_merger import build_topics_csv
 
 
@@ -37,14 +38,6 @@ def regenerate_topics_from_cache():
     Re-extracts topics for every previously-seen article link, using only
     the cached HTML in ARTICLE_DIR (no network fetches for articles already
     downloaded), then rebuilds topics.csv and index.html.
-
-    Link lists come from CACHE_DIR/{year}_links.json when available; years
-    without one (i.e. every year except the current one, which is the only
-    one check_new_articles maintains a link file for) fall back to the
-    "Link" column of that year's existing topics_{year}.csv, so historical
-    years get re-extracted too instead of only ever getting the version
-    produced by whichever extraction logic was current when they were
-    first scraped.
     """
     years_with_link_file = set()
     for link_file in sorted(CACHE_DIR.glob("*_links.json")):
