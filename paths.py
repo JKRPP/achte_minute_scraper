@@ -3,7 +3,7 @@ from pathlib import Path
 
 ## Scraper state that is expensive to rebuild (downloaded articles, per-year
 ## topic csvs, link lists). Persisted across rebuilds via a docker volume.
-CACHE_DIR = Path(os.environ.get("CACHE_DIR", "."))
+CACHE_DIR = Path(os.environ.get("CACHE_DIR", "cache/"))
 
 ## Generated site the web container serves.
 OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", "."))
