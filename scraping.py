@@ -186,7 +186,7 @@ def extract_topics_for_links(
     return pd.DataFrame(all_topics)
 
 
-def initial_generation(starting_year=2013, force_regenerate=False, verbose=False):
+def initial_generation(starting_year=2008, force_regenerate=False, verbose=False):
     first_year = starting_year
     last_year = datetime.now().year
 

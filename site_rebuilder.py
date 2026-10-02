@@ -16,7 +16,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--starting-year",
         type=int,
-        default=2013,
+        default=2008,
         help="First year to (re)generate topics for.",
     )
     args = parser.parse_args()
