@@ -88,7 +88,7 @@ def _get_build_id() -> str:
         commit = "unknown"
 
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    return f"{commit} · {generated_at}"
+    return f"{commit} - {generated_at}"
 
 
 TEMPLATE = """<!doctype html>
@@ -297,6 +297,41 @@ TEMPLATE = """<!doctype html>
     z-index: 5;
   }}
   .motion-typ-popover.open {{ display: block; }}
+  .export-wrap {{
+    position: relative;
+    margin-right: auto;
+  }}
+  .export-toggle {{
+    padding: .3rem .6rem;
+    font-size: .8rem;
+  }}
+  .export-popover {{
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: .3rem;
+    min-width: 200px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: .25rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .15);
+    z-index: 6;
+  }}
+  .export-popover.open {{ display: block; }}
+  .export-popover button {{
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 0;
+    color: var(--text);
+    padding: .5rem .6rem;
+    font-size: .85rem;
+    cursor: pointer;
+  }}
+  .export-popover button:hover:not(:disabled) {{ color: var(--accent); }}
+  .export-popover button:disabled {{ opacity: .5; cursor: not-allowed; }}
   .motion-typ-option {{
     display: flex;
     align-items: center;
@@ -1009,6 +1044,13 @@ TEMPLATE = """<!doctype html>
   </div>
   <div class="count-row">
     <div class="count" id="resultCount"></div>
+    <div class="export-wrap">
+      <button type="button" class="filter-toggle export-toggle" id="exportToggle">Exportieren</button>
+      <div class="export-popover" id="exportPopover">
+        <button type="button" id="exportCsvBtn">Als CSV herunterladen</button>
+        <button type="button" id="exportPdfBtn">Als PDF (Druckansicht)</button>
+      </div>
+    </div>
     <div class="page-size">
       <label for="pageSizeFilter">Pro Seite</label>
       <select id="pageSizeFilter">
@@ -1048,7 +1090,7 @@ TEMPLATE = """<!doctype html>
 
 <footer>
   <button type="button" id="impressumBtn">Impressum</button>
-  <span class="footer-sep">·</span>
+  <span class="footer-sep">-</span>
   <a class="repo-link" href="https://github.com/JKRPP/achte_minute_scraper" target="_blank" rel="noopener">GitHub</a>
 </footer>
 
@@ -1129,6 +1171,10 @@ const pagePrevEl = document.getElementById('pagePrev');
 const pageNextEl = document.getElementById('pageNext');
 const pageInputEl = document.getElementById('pageInput');
 const pageCountLabelEl = document.getElementById('pageCountLabel');
+const exportToggle = document.getElementById('exportToggle');
+const exportPopover = document.getElementById('exportPopover');
+const exportCsvBtn = document.getElementById('exportCsvBtn');
+const exportPdfBtn = document.getElementById('exportPdfBtn');
 
 let sortKey = 'Datum';
 let sortDir = -1;
@@ -1441,11 +1487,8 @@ function getFilteredData() {{
   }});
 }}
 
-function render() {{
-  updateYearRangeUi();
-  updateFilterUi();
-
-  let filtered = getFilteredData();
+function getFilteredSorted() {{
+  const filtered = getFilteredData();
 
   const tieBreakKeys = ['Datum', 'Tournament', 'Runde'].filter(k => k !== sortKey);
 
@@ -1463,6 +1506,14 @@ function render() {{
     }}
     return 0;
   }});
+  return filtered;
+}}
+
+function render() {{
+  updateYearRangeUi();
+  updateFilterUi();
+
+  const filtered = getFilteredSorted();
 
   const pageSize = pageSizeEl.value === 'all' ? filtered.length : Number(pageSizeEl.value);
   const pageCount = pageSize > 0 ? Math.max(1, Math.ceil(filtered.length / pageSize)) : 1;
@@ -1497,6 +1548,7 @@ function render() {{
 
   emptyEl.style.display = filtered.length ? 'none' : 'block';
   countEl.textContent = `${{filtered.length}} von ${{DATA.length}} Themen`;
+  exportCsvBtn.disabled = exportPdfBtn.disabled = filtered.length === 0;
 
   paginationEl.classList.toggle('hidden', pageCount <= 1);
   pageInputEl.max = pageCount;
@@ -1559,6 +1611,130 @@ function jumpToTypedPage() {{
 pageInputEl.addEventListener('change', jumpToTypedPage);
 pageInputEl.addEventListener('keydown', (e) => {{
   if (e.key === 'Enter') jumpToTypedPage();
+}});
+
+
+// ---- Export (CSV / printable PDF) of everything matching the current filters ----
+const EXPORT_PDF_CONFIRM_THRESHOLD = 2000;
+
+exportToggle.addEventListener('click', (e) => {{
+  e.stopPropagation();
+  exportPopover.classList.toggle('open');
+}});
+document.addEventListener('click', (e) => {{
+  if (!exportPopover.contains(e.target) && e.target !== exportToggle) {{
+    exportPopover.classList.remove('open');
+  }}
+}});
+
+function exportDateStamp() {{
+  return new Date().toISOString().slice(0, 10);
+}}
+
+function csvCell(v) {{
+  const s = (v ?? '').toString();
+  return /[",\\r\\n]/.test(s) ? `"${{s.replaceAll('"', '""')}}"` : s;
+}}
+
+function exportCsv() {{
+  const items = getFilteredSorted();
+  if (!items.length) return;
+  const header = ['Datum', 'Turnier', 'Runde', 'Format', 'Sprache', 'Motion-Typ', 'Thema', 'Factsheet', 'Quelle', 'Link'];
+  const lines = [header.map(csvCell).join(',')];
+  for (const d of items) {{
+    lines.push([
+      d.Datum, d.Tournament, d.Runde, d.Format, d.Sprache, d['Motion-Typ'],
+      d.Thema, d.Factsheet, d.Link, buildMotionShareUrl(d),
+    ].map(csvCell).join(','));
+  }}
+  // BOM so Excel detects UTF-8 (umlauts); CRLF per RFC 4180.
+  const blob = new Blob(['\\ufeff' + lines.join('\\r\\n') + '\\r\\n'], {{ type: 'text/csv;charset=utf-8' }});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `motions-${{exportDateStamp()}}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}}
+
+function describeActiveFilters() {{
+  const parts = [];
+  const q = searchEl.value.trim();
+  if (q) parts.push(`Suche: „${{q}}“`);
+  if (Number(yearFromEl.value) !== yearMin || Number(yearToEl.value) !== yearMax) {{
+    parts.push(`Zeitraum: ${{yearRangeLabelEl.textContent}}`);
+  }}
+  if (formatEl.value) parts.push(`Format: ${{formatEl.value}}`);
+  if (spracheEl.value) parts.push(`Sprache: ${{SPRACHE_LABELS[spracheEl.value] ?? spracheEl.value}}`);
+  if (infoslideEl.value) parts.push(infoslideEl.value === 'mit' ? 'Mit Factsheet' : 'Ohne Factsheet');
+  if (outroundEl.value) parts.push(`Outround: ${{outroundEl.value === 'ja' ? 'Ja' : 'Nein'}}`);
+  if (selectedMotionTypes.size) parts.push(`Motion-Typ: ${{[...selectedMotionTypes].join(', ')}}`);
+  return parts.length ? parts.join(' - ') : 'Keine Filter';
+}}
+
+const PRINT_CSS = `
+  @page {{ size: A4; margin: 18mm 32mm; }}
+  * {{ box-sizing: border-box; }}
+  body {{ font-family: Georgia, 'Times New Roman', serif; color: #000; background: #fff; font-size: 11pt; line-height: 1.4; margin: 0; }}
+  h1 {{ font-size: 16pt; margin: 0 0 .8rem; }}
+  .sub {{ color: #444; font-size: 9pt; margin: 0 0 .15rem; }}
+  .sub:last-of-type {{ margin-bottom: 3rem; }}
+  .motion {{ break-inside: avoid; padding: .7rem 0; }}
+  .motion + .motion {{ margin-top: 1.6rem; }}
+  .head {{ font-family: Arial, sans-serif; font-size: 8.5pt; color: #444; margin-bottom: .2rem; }}
+  .thema {{ font-weight: bold; font-size: 11.5pt; margin: 0; }}
+  .factsheet {{ margin: 0 0 .3rem; font-size: 10pt; color: #222; white-space: pre-wrap; }}
+  a {{ color: inherit; text-decoration: none; }}
+  .toolbar {{ font-family: Arial, sans-serif; margin-bottom: 1rem; }}
+  @media print {{ .toolbar {{ display: none; }} }}
+`;
+
+function exportPdf() {{
+  const items = getFilteredSorted();
+  if (!items.length) return;
+  if (items.length > EXPORT_PDF_CONFIRM_THRESHOLD
+      && !confirm(`${{items.length}} Themen als pdf exportieren?`)) return;
+
+  const win = window.open('', '_blank');
+  if (!win) {{
+    alert('Das Druckfenster wurde vom Browser blockiert. Bitte Pop-ups für diese Seite erlauben.');
+    return;
+  }}
+
+  const body = items.map(d => {{
+    const head = [d.Datum, d.Tournament, d.Runde, d.Format].filter(Boolean).map(escapeHtml).join(' - ');
+    const factsheet = (d.Factsheet ?? '').toString().trim();
+    return `<div class="motion">
+      <div class="head">${{head}}</div>
+      ${{factsheet ? `<p class="factsheet">${{linkifyHtml(factsheet)}}</p>` : ''}}
+      <p class="thema">${{escapeHtml(d.Thema)}}</p>
+    </div>`;
+  }}).join('');
+
+  const title = 'Themen des Theminators';
+  win.document.write(`<!doctype html><html lang="de"><head><meta charset="utf-8">
+    <title>${{escapeHtml(title)}} ${{exportDateStamp()}}</title>
+    <style>${{PRINT_CSS}}</style></head><body>
+    <div class="toolbar"><button onclick="window.print()">Drucken / Als PDF speichern</button></div>
+    <h1>${{escapeHtml(title)}}</h1>
+    <p class="sub">${{items.length}} Themen - Stand ${{exportDateStamp()}}</p>
+    <p class="sub">${{escapeHtml(describeActiveFilters())}}</p>
+    ${{body}}
+  </body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 300);
+}}
+
+exportCsvBtn.addEventListener('click', () => {{
+  exportPopover.classList.remove('open');
+  exportCsv();
+}});
+exportPdfBtn.addEventListener('click', () => {{
+  exportPopover.classList.remove('open');
+  exportPdf();
 }});
 
 render();
