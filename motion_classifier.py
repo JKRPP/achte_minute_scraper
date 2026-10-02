@@ -20,7 +20,7 @@ def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
         (r"Dieses Haus hält.*für falsch", "Dieses Haus bedauert..."),
         (
             r"Dieses Haus (?:begrüßt|befürwortet|unterstützt|wünscht|möchte|feiert)",
-            "Dieses haus begrüßt...",
+            "Dieses Haus begrüßt...",
         ),
         (
             r"Dieses Haus (?:bevorzugt|präferiert|zieht|entscheidet sich)",
@@ -32,10 +32,10 @@ def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
         (r"(?:This house believes|THBT)", "Dieses Haus glaubt..."),
         (r"This house opposes", "Dieses Haus bedauert..."),
         (r"This house regrets", "Dieses Haus bereut..."),
-        (r"This house supports", "Dieses haus begrüßt..."),
+        (r"This house supports", "Dieses Haus begrüßt..."),
         (r"This house prefers", "Dieses Haus bevorzugt..."),
         (r"This house hopes", "Dieses Haus hofft..."),
-        (r"This house predicts", "Dieses Haus sagt vorraus..."),
+        (r"This house predicts", "Dieses Haus sagt voraus..."),
         (r"THPAW", "Dieses Haus bevorzugt..."),
     ]
 
