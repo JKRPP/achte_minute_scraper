@@ -50,6 +50,8 @@ _CLEAR_GERMAN_RE = re.compile(
 _CLEAR_ENGLISH_RE = re.compile(
     r"(This house|This House|regrets|supports|would|Would|prefers)"
 )
+# Unuser characters to remove
+_LEADING_BRACKET_RE = re.compile(r"^\.?\)\s*")
 _CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
@@ -132,6 +134,7 @@ def _finalize_round(
 
     # Fix typos for processing ("Diese Haus" etc.)
     topic = _fix_common_typos(topic)
+    topic = _LEADING_BRACKET_RE.sub("", topic)
     factsheet = _fix_common_typos(factsheet)
 
     topic_format = _extract_format_from_topic(topic)
