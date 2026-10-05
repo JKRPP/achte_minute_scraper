@@ -4,8 +4,17 @@ import re
 
 from bs4 import BeautifulSoup
 
-from .round_content import _finalize_round, _group_into_rounds, _looks_like_topic
-from .round_labels import _match_inline_round_label, _match_round_label
+from .round_content import (
+    _extract_format_from_topic,
+    _finalize_round,
+    _group_into_rounds,
+    _looks_like_topic,
+)
+from .round_labels import (
+    _match_inline_round_label,
+    _match_label_stem,
+    _match_round_label,
+)
 from .text import _linkify_anchors, _normalize_whitespace, _strip_quotes
 
 # Matches lead in paragraph ("Die Themen:")
@@ -77,28 +86,59 @@ def _match_any_round_label(line: str):
     return _match_round_label(line) or _match_inline_round_label(line)
 
 
+def _paragraph_lines(p) -> list[str]:
+    """
+    Splits a paragraph into its non-empty lines and reattaches colons after tags
+    """
+    lines: list[str] = []
+    for line in p.get_text("\n").split("\n"):
+        line = _normalize_whitespace(line)
+        if not line:
+            continue
+        if lines and line[0] == ":" and not lines[-1].endswith(":"):
+            lines[-1] += line
+        else:
+            lines.append(line)
+    return lines
+
+
+def _only_has_factsheet(lines: list[str]) -> bool:
+    """Checks whether a round label is followed by a factsheet label (and no topic)."""
+    for line in lines:
+        label = _match_any_round_label(line)
+        if _match_label_stem(label.group(2) if label else line):
+            return True
+    return False
+
+
 def _inline_round_list_entries(soup: BeautifulSoup) -> list[dict[str, str]]:
     """
     Fallback for pre-2013 articles that list topics as new lines of text with no list.
     """
     entries = []
     for p in soup.find_all("p"):
-        lines = [
-            line
-            for line in (
-                _normalize_whitespace(line) for line in p.get_text("\n").split("\n")
-            )
-            if line
-        ]
+        lines = _paragraph_lines(p)
         # Break announcements ("Halbfinale 1: Team A vs. Team B") pair teams, they list no topic
         if any(_VERSUS_LINE_RE.match(line) for line in lines):
             continue
-        entries.extend(
-            entry
-            for entry in _group_into_rounds(lines, _match_any_round_label)
-            # Team lists ("Viertelfinale (Main Break): Team A, Team B") are no topics
-            if not _is_enumeration(entry)
-        )
+        round_entries = _group_into_rounds(lines, _match_any_round_label)
+
+        # A round label paragraph can be followed by the topic in a paragraph of its own
+        next_p = p.find_next_sibling("p")
+        if round_entries and next_p is not None:
+            next_lines = _paragraph_lines(next_p)
+            if (
+                _only_has_factsheet(lines)
+                and round_entries[-1]["Format"] == "unbekannt"
+                and not any(_match_any_round_label(line) for line in next_lines)
+                and _extract_format_from_topic(" ".join(next_lines)) != "unbekannt"
+            ):
+                round_entries = _group_into_rounds(
+                    lines + next_lines, _match_any_round_label
+                )
+
+        # Team lists ("Viertelfinale (Main Break): Team A, Team B") are no topics
+        entries.extend(e for e in round_entries if not _is_enumeration(e))
 
     return entries
 
@@ -145,4 +185,6 @@ def _is_enumeration(entry: dict[str, str]) -> bool:
     Checks whether an entry is a bare enumeration (teams, places) rather than a
     topic: unknown format and no sentence end.
     """
-    return entry["Format"] == "unbekannt" and not _SENTENCE_END_RE.search(entry["Thema"])
+    return entry["Format"] == "unbekannt" and not _SENTENCE_END_RE.search(
+        entry["Thema"]
+    )
