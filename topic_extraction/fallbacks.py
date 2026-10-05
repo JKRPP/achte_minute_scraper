@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 
 from .round_content import _finalize_round, _group_into_rounds, _looks_like_topic
 from .round_labels import _match_inline_round_label, _match_round_label
-from .text import _linkify_anchors, _normalize_whitespace
+from .text import _linkify_anchors, _normalize_whitespace, _strip_quotes
 
 # Matches lead in paragraph ("Die Themen:")
 _THEMEN_INTRO_RE = re.compile(r"Themen?\b.*:\s*$", re.IGNORECASE)
@@ -15,6 +15,15 @@ _THEMEN_INTRO_RE = re.compile(r"Themen?\b.*:\s*$", re.IGNORECASE)
 _THEMA_INTRO_RE = re.compile(
     r"\bThema\b(?:\s+(?:der|des)\s+(\w+))?[^:]{0,60}?:\s*", re.IGNORECASE | re.DOTALL
 )
+
+# Matches list items that consist only of a link
+_URL_ONLY_RE = re.compile(r"^\S+://\S+$|^\[[^\]]*\]\(\S+\)$")
+
+# Matches a closing sentence end (. ? ! plus optional closing quotes/brackets)
+_SENTENCE_END_RE = re.compile(r"[.?!][\"“”„)\]]*\s*$")
+
+# Matches the "vs." separator line between two teams
+_VERSUS_LINE_RE = re.compile(r"^vs\.?$", re.IGNORECASE)
 
 # Finds a round label if only one topic is mentioned in the article
 _TITLE_ROUND_RE = re.compile(
@@ -42,7 +51,8 @@ def _topic_list_segments(soup: BeautifulSoup) -> list[str]:
         _linkify_anchors(list_tag)
         for li in list_tag.find_all("li", recursive=False):
             item_text = _normalize_whitespace(li.get_text())
-            if item_text:
+            # Link lists (social media etc.) are no topic lists
+            if item_text and not _URL_ONLY_RE.match(item_text):
                 segments.append(item_text)
 
     return segments
@@ -73,9 +83,21 @@ def _inline_round_list_entries(soup: BeautifulSoup) -> list[dict[str, str]]:
     """
     entries = []
     for p in soup.find_all("p"):
-        lines = (_normalize_whitespace(line) for line in p.get_text("\n").split("\n"))
+        lines = [
+            line
+            for line in (
+                _normalize_whitespace(line) for line in p.get_text("\n").split("\n")
+            )
+            if line
+        ]
+        # Break announcements ("Halbfinale 1: Team A vs. Team B") pair teams, they list no topic
+        if any(_VERSUS_LINE_RE.match(line) for line in lines):
+            continue
         entries.extend(
-            _group_into_rounds([line for line in lines if line], _match_any_round_label)
+            entry
+            for entry in _group_into_rounds(lines, _match_any_round_label)
+            # Team lists ("Viertelfinale (Main Break): Team A, Team B") are no topics
+            if not _is_enumeration(entry)
         )
 
     return entries
@@ -97,7 +119,7 @@ def _inline_thema_entries(soup: BeautifulSoup, title: str) -> list[dict[str, str
             next_p = p.find_next_sibling("p")
             remainder = _normalize_whitespace(next_p.get_text(" ")) if next_p else ""
 
-        if not remainder or not _looks_like_topic(remainder):
+        if not remainder or not _looks_like_topic(_strip_quotes(remainder)):
             continue
 
         round_label = _round_label_from_title(title) or match.group(1) or "Thema"
@@ -116,3 +138,11 @@ def _round_label_from_title(title: str) -> str | None:
     if match.group(1):
         return f"{match.group(1).capitalize()} {match.group(2)}"
     return match.group(3).capitalize()
+
+
+def _is_enumeration(entry: dict[str, str]) -> bool:
+    """
+    Checks whether an entry is a bare enumeration (teams, places) rather than a
+    topic: unknown format and no sentence end.
+    """
+    return entry["Format"] == "unbekannt" and not _SENTENCE_END_RE.search(entry["Thema"])
