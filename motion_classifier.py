@@ -1,7 +1,11 @@
+"""Assigns each motion a motion type based on its wording."""
+
 import pandas as pd
 
 
 def classify_motion_types(input_df: pd.DataFrame) -> pd.DataFrame:
+    """Adds a "Motion-Typ" column by matching each topic against its format's patterns."""
+    # Patterns are tried in order and the first match wins, so specific ones come first
     bp_filtering_patterns = [
         (r"Dieses Haus glaubt.*sollte", "Dieses Haus glaubt, X sollte..."),
         (

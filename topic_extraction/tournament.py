@@ -1,4 +1,4 @@
-"""Deriving tournament names (and regional championship abbreviations)."""
+"""Derives tournament names, including regional championship abbreviations."""
 
 import re
 
@@ -6,7 +6,7 @@ from .data import _TOURNAMENT_NAME_OVERRIDES, _TOURNAMENT_TITLE_REPLACEMENTS
 
 _REGIONALMEISTERSCHAFTEN_RE = re.compile(r"Regionalmeisterschaften?", re.IGNORECASE)
 
-# Splits "<winner> gewinnt <tournament>" style headlines
+# "<winner> gewinnt <tournament>" style headlines, capturing the tournament
 _WINNER_PREFIX_RE = re.compile(
     r"(?:gewinnt|gewinnen|siegreich|wins|triumphieren|triumphiert|Sieger|siegt?)[- ](?:beim|den|die|das|dem|des|der|einen?|eine[mnrs]?|d[iea]|de[mnrs]?|the)?\s*(.+)$",
     re.IGNORECASE,
@@ -17,6 +17,7 @@ _TITLE_REPLACEMENTS = [
     for large_description, replacement in _TOURNAMENT_TITLE_REPLACEMENTS.items()
 ]
 
+# Headline boilerplate around the tournament name ("Daten und Ergebnisse", "Der Break", ...)
 _DATEN_UND_ERGEBNISSE_RE = re.compile(
     r"^(?:Die\s+)?(.+?)\s+Daten\s+Und\s+Ergebnisse$", re.IGNORECASE
 )
@@ -34,6 +35,7 @@ _OVERVIEW_SUFFIX_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Trailing place, year or dash suffix ("in Berlin", "2019", "- Tag 2")
 _PREPOSITION_YEAR_SUFFIX_RE = re.compile(
     r"(?:\s+(?:in|bei|beim|am|im|vor|nach|aus|zu|vom|v\.)\s+[\w\s]+$)|(?:\s+\d{4}\s*$)|(?:\s+-\s+[\w\s]+$)",
     re.IGNORECASE,
@@ -47,28 +49,25 @@ _LEADING_ARTICLE_RE = re.compile(r"^(?:Der|Die|Das)\s+", re.IGNORECASE)
 
 _PARENTHESIZED_ABBREVIATION_RE = re.compile(r"\(([A-ZÄÖÜ]{2,4})\)")
 
-# Matches regional words to translate regionals ("Nordost" -> "NO")
+# Initials of compass directions in regional names ("Nordost" -> "NO")
 _DIRECTION_INITIALS = {"nord": "N", "ost": "O", "süd": "S", "sued": "S", "west": "W"}
 
+# Written-out regional championship ("Nordostdeutsche Meisterschaft")
 _REGION_MEISTERSCHAFT_RE = re.compile(
-    # Matches regional tournament labels
     r"^((?:nord|ost|süd|sued|west)+)deutsche\s+(?:Debattier)?[Mm]eisterschaft\b",
     re.IGNORECASE,
 )
 
-# Matches abbreviated regional championships
+# Abbreviated regional championship ("NODM", "SDM")
 _REGION_ABBREVIATION_RE = re.compile(r"^[NOSW]{1,3}DM$")
 
 
 def _extract_tournament_name(url: str, title: str) -> str:
-    """
-    Extracts the clear name of the tournament from an article's headline.
-    Some extractions are manually overwritten in tournament_title_replacements.json
-    """
+    """Derives the tournament name from an article's headline (or URL), unless overridden for that URL."""
     if url in _TOURNAMENT_NAME_OVERRIDES:
         return _TOURNAMENT_NAME_OVERRIDES[url]
 
-    # If there is an abbreviation after a tournament name, us this
+    # An abbreviation in parentheses ("(NODM)") is used as is
     parenthesized = _parenthesized_region_abbreviation(title)
     if parenthesized:
         return parenthesized
@@ -97,23 +96,17 @@ def _extract_tournament_name(url: str, title: str) -> str:
     out = _OVERVIEW_SUFFIX_RE.sub("", out).strip()
     out = _PREPOSITION_YEAR_SUFFIX_RE.sub("", out).strip()
 
-    # Cut out all years from tournament names
     out = _YEAR_CUTOFF_RE.sub("", out).strip()
 
-    # Remove characters not belonging in the Title
     out = _TITLE_JUNK_CHARS_RE.sub("", out)
 
-    # Remove all leading articles
     out = _LEADING_ARTICLE_RE.sub("", out).strip()
 
     return out
 
 
 def _tournament_name_for_section(section: str) -> str:
-    """
-    If an article contains multiple tournaments extract each segment
-    seperately (happens only in regional championship articles)
-    """
+    """Derives the tournament name of one section in a multi-tournament (regional championship) article."""
     if section.isupper() and " " in section:
         section = section.title()
 
@@ -121,10 +114,7 @@ def _tournament_name_for_section(section: str) -> str:
 
 
 def _parenthesized_region_abbreviation(text: str) -> str | None:
-    """
-    Finds a regional championship's abbreviation when it's already spelled
-    out in parentheses
-    """
+    """Returns a regional championship abbreviation already given in parentheses ("(NODM)")."""
     match = _PARENTHESIZED_ABBREVIATION_RE.search(text)
     if match and _REGION_ABBREVIATION_RE.match(match.group(1)):
         return match.group(1)
@@ -132,9 +122,7 @@ def _parenthesized_region_abbreviation(text: str) -> str | None:
 
 
 def _abbreviate_region_name(name: str) -> str | None:
-    """
-    Abbreviates a regional championship's name
-    """
+    """Abbreviates a regional championship's name ("Nordostdeutsche Meisterschaft" -> "NODM")."""
     name = name.strip()
 
     parenthesized = _parenthesized_region_abbreviation(name)

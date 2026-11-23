@@ -1,4 +1,4 @@
-"""Turning one round's raw segments into a topic/factsheet entry, including format and language detection."""
+"""Turns a round's raw segments into a topic/factsheet entry with format and language."""
 
 import re
 from collections.abc import Callable, Iterable
@@ -9,7 +9,7 @@ from .data import _BP_MOTION_START, _OPD_MOTION_START
 from .round_labels import _match_label_stem, _match_round_label
 from .text import _fix_common_typos, _normalize_whitespace, _strip_quotes
 
-# Markers that show speakers/teams/adjudicators (signify that there is no topic after)
+# Lineup markers (teams, speakers, judges); a round containing one has no topic
 _LINEUP_MARKER_RE = re.compile(
     r"(?<!\S)(Regierung|Reg|Opposition|Opp|(?:Fraktionsfreie|Freie)\s+Redner|FFR"
     r"|(?-i:ER|EO|SR|SO|OG|OO|CG|CO))\s*:"
@@ -17,41 +17,42 @@ _LINEUP_MARKER_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Matches scentences that start like BP or OPD topics (for unformatted texts)
+# Text that reads like a BP or OPD motion
 _TOPIC_LIKE_RE = re.compile(
     rf"\?\s*$|^(?:{_BP_MOTION_START})\b|^(?:{_OPD_MOTION_START})\b",
     re.IGNORECASE,
 )
 
-# Matches BP motion signifiers
+# BP motion opener anywhere in the text
 _BP_FORMAT_RE = re.compile(rf"\b(?:{_BP_MOTION_START})\b", re.IGNORECASE)
 
-# Matches OPD motion signifiers
+# OPD motion opener at the start of a sentence
 _OPD_FORMAT_RE = re.compile(rf"(?:^|[:.!?]\s*)(?:{_OPD_MOTION_START})\b", re.IGNORECASE)
 
-# Matches Infoslide labels
+# Factsheet label inside a topic ("... Infoslide: ...")
 _TRAILING_LABEL_RE = re.compile(
     r"(?<!\S)(Fact(?:sheet)?|Info(?:slide)?|Definition)\s*:", re.IGNORECASE
 )
 
-# Old articles sometimes omit the infoslide but write (inkl. Infoslide) in front
+# "inkl." that old articles put in front of factsheet labels ("(inkl. Infoslide)")
 _INKL_PREFIX_RE = re.compile(r"^inkl\.?\s*", re.IGNORECASE)
 
-# Matches footnotes in motions (get then processed as infoslides)
+# Footnote marker ("*", "[1]"); footnotes belong to the factsheet
 _FOOTNOTE_RE = re.compile(r"^(?:\*+|\[\d+\])")
 
+# Sentence end followed by a new sentence or the end of the text
 _SENTENCE_END_RE = re.compile(r"[.?!]+(?=\s+[A-ZÄÖÜ]|\s*$)")
 
-# Clear signifiers for german topics
+# Unambiguous German/English wording, checked before falling back to CLD2
 _CLEAR_GERMAN_RE = re.compile(
     r"(DH|Dieses Haus|begrüßt|bedauert|bereut|würde|Würde|Sollten)"
 )
-# Clear signifiers for english topics
 _CLEAR_ENGLISH_RE = re.compile(
     r"(This house|This House|regrets|supports|would|Would|prefers)"
 )
-# Unuser characters to remove
+# Stray leading bracket left over from a split label
 _LEADING_BRACKET_RE = re.compile(r"^\.?\)\s*")
+# Control characters, removed before passing text to CLD2
 _CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
@@ -59,15 +60,13 @@ def _group_into_rounds(
     segments: Iterable[str],
     match_label: Callable[[str], re.Match | None] = _match_round_label,
 ) -> list[dict[str, str]]:
-    """
-    Groups segments by round by matching round labels. Everything before
-    the first round label is discarded, lineup inserts are discarded.
-    """
+    """Groups segments into rounds by their labels; text before the first label and lineups are dropped."""
     entries = []
     current_round = None
     current_content: list[str] = []
 
     def finish_round():
+        """Finalizes the current round unless it lists a lineup."""
         if any(_LINEUP_MARKER_RE.search(c) for c in current_content):
             return
         entry = _finalize_round(current_round, current_content)
@@ -80,6 +79,7 @@ def _group_into_rounds(
             finish_round()
             current_round = label_match.group(1).strip()
             remainder = label_match.group(2).strip()
+            # Unwrap fully parenthesized rounds ("(Runde 1: ...)")
             if segment.startswith("(") and remainder.endswith(")"):
                 remainder = remainder[:-1].strip()
             current_content = [remainder] if remainder else []
@@ -93,10 +93,7 @@ def _group_into_rounds(
 def _finalize_round(
     round_label: str | None, content: list[str]
 ) -> dict[str, str] | None:
-    """
-    Turns a round's accumulated segments into a {Runde, Thema, Factsheet,
-    Sprache, Format} entry.
-    """
+    """Turns a round's segments into a {Runde, Thema, Factsheet, Sprache, Format} entry."""
     if round_label is None or not content:
         return None
 
@@ -119,8 +116,7 @@ def _finalize_round(
             topic = new_topic
             factsheet_parts.append(trailing_factsheet)
 
-    # Make leading paragraphs before topics their infoslide, even if
-    # not labeled
+    # A leading parenthetical belongs to the factsheet; if there already is one, only when labeled
     leading_parenthetical, topic = _split_leading_parenthetical(
         topic, require_label=bool(factsheet_parts)
     )
@@ -132,13 +128,14 @@ def _finalize_round(
         _strip_quotes(" ".join(part for part in stripped_parts if part).strip())
     )
 
-    # Fix typos for processing ("Diese Haus" etc.)
+    # Fix common typos ("Diese Haus") before detecting the format
     topic = _fix_common_typos(topic)
     topic = _LEADING_BRACKET_RE.sub("", topic)
     factsheet = _fix_common_typos(factsheet)
 
     topic_format = _extract_format_from_topic(topic)
 
+    # Topic and factsheet are swapped if only the factsheet reads like a motion
     if topic_format == "unbekannt":
         factsheet_format = _extract_format_from_topic(factsheet)
         if factsheet_format != "unbekannt":
@@ -155,22 +152,18 @@ def _finalize_round(
 
 
 def _find_topic_index(content: list[str]) -> tuple[int, set[int]]:
-    """
-    Finds the topic segment of an article
-    """
+    """Returns the index of the topic segment and the indices of segments to drop."""
     topic_index = None
     fallback_topic_index = None
     dropped_indices = set()
+    # Search backwards, since the topic usually comes last
     for i in range(len(content) - 1, -1, -1):
         stripped = content[i].strip()
+        # Factsheet labels, bullet points, parentheticals and footnotes are never the topic
         if (
             _match_label_stem(content[i])
-            # Don't discard bullet-pointed lists in infoslides
             or stripped.startswith(("-", "–", "—", "•"))
-            # Don't discard paragraphs in parantheses (most often
-            # clarifying statements)
             or (stripped.startswith("(") and stripped.endswith(")"))
-            # Footnotes are never a topic, but belong to the infoslide
             or _FOOTNOTE_RE.match(stripped)
         ):
             continue
@@ -182,8 +175,8 @@ def _find_topic_index(content: list[str]) -> tuple[int, set[int]]:
             break
         dropped_indices.add(i)
 
+    # No motion-like segment, so fall back to the last non-factsheet one
     if topic_index is None:
-        # If no topic is found, revert to fallback behaviour
         topic_index = (
             fallback_topic_index
             if fallback_topic_index is not None
@@ -195,12 +188,11 @@ def _find_topic_index(content: list[str]) -> tuple[int, set[int]]:
 
 
 def _strip_factsheet_label(part: str) -> str:
-    """Removes a leading "inkl." and "Info:"/"Fact:"-style label from a factsheet part."""
+    """Removes a leading "inkl." and "Info:"-style label from a factsheet part."""
     part = _INKL_PREFIX_RE.sub("", part)
     label_match = _match_label_stem(part)
     if label_match:
-        # Cut at the label's colon rather than just the first word, so
-        # multi-word labels (e.g. "info slide:") are fully removed.
+        # Cut at the colon so multi-word labels ("info slide:") are removed fully
         colon_index = part.find(":", 0, 30)
         cut = colon_index + 1 if colon_index != -1 else label_match.end()
         part = part[cut:].strip()
@@ -208,15 +200,12 @@ def _strip_factsheet_label(part: str) -> str:
 
 
 def _looks_like_topic(text: str) -> bool:
-    """See _TOPIC_LIKE_RE."""
+    """Checks whether text reads like a motion (see _TOPIC_LIKE_RE)."""
     return bool(_TOPIC_LIKE_RE.search(text.strip()))
 
 
 def _split_labelled_topic(text: str) -> tuple[str, str]:
-    """
-    Splits topics that start with "Factsheet:" or similar
-    into topic (last sentence) and factsheet (everything else)
-    """
+    """Splits a "Factsheet: ..." topic into (factsheet, topic), the topic being the last sentence."""
     if "\n" in text:
         prefix, _, last = text.rpartition("\n")
         if prefix.strip() and last.strip():
@@ -232,9 +221,7 @@ def _split_labelled_topic(text: str) -> tuple[str, str]:
 
 
 def _split_trailing_factsheet(text: str) -> tuple[str, str]:
-    """
-    Moves a trailing factsheet from the topic to the factsheet.
-    """
+    """Splits a trailing "Factsheet: ..." off the topic, returning (topic, factsheet)."""
     match = _TRAILING_LABEL_RE.search(text)
     if not match or match.start() == 0:
         return text, ""
@@ -248,10 +235,7 @@ def _split_trailing_factsheet(text: str) -> tuple[str, str]:
 
 
 def _split_leading_parenthetical(text: str, require_label: bool) -> tuple[str, str]:
-    """
-    Splits a leading parenthetical off the topic, returning it and the
-    remaining topic.
-    """
+    """Splits a leading parenthetical off the topic, returning (parenthetical, topic)."""
     stripped = text.lstrip()
     if not stripped.startswith("("):
         return "", text
@@ -282,9 +266,7 @@ def _split_leading_parenthetical(text: str, require_label: bool) -> tuple[str, s
 
 
 def _extract_format_from_topic(topic: str) -> str:
-    """
-    Classifies a topic into either BP or OPD based on its topic string.
-    """
+    """Classifies a topic as "BP", "OPD" or "unbekannt" from its wording."""
     topic_to_match = topic.strip().replace('"', "")
 
     if _BP_FORMAT_RE.search(topic_to_match):
@@ -300,9 +282,7 @@ def _extract_format_from_topic(topic: str) -> str:
 
 
 def _detect_language(text: str) -> str:
-    """
-    Detects the language of a given string using Googles CLD2 model.
-    """
+    """Detects a topic's language from clear keywords, falling back to Google's CLD2."""
     if _CLEAR_GERMAN_RE.search(text):
         return "GERMAN"
 

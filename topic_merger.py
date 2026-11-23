@@ -1,3 +1,5 @@
+"""Merges, cleans and deduplicates the per-year topic csvs into topics.csv."""
+
 import glob
 import json
 import os
@@ -12,12 +14,7 @@ _DATA_DIR = Path(__file__).parent / "data"
 
 
 def merge_csv_files(input_folder: str = None):
-    """
-    Merges the per-year topic CSVs in a folder into one dataframe, sorted by date.
-
-    Args:
-        input_folder: Path to folder containing CSV files
-    """
+    """Merges the per-year topic csvs in a folder into one DataFrame sorted by date."""
     if input_folder is None:
         input_folder = str(CACHE_DIR)
 
@@ -28,7 +25,6 @@ def merge_csv_files(input_folder: str = None):
         print(f"No files found matching 'topics_*.csv' in {input_folder}")
         return None
 
-    # Read all files
     all_dfs = []
     for file in csv_files:
         try:
@@ -43,17 +39,13 @@ def merge_csv_files(input_folder: str = None):
 
     merged_df = pd.concat(all_dfs, ignore_index=True)
 
-    # Index by date
     return merged_df.sort_values(by="Datum").reset_index(drop=True)
 
 
 def deduplicate_topics(
     input_df: pd.DataFrame, topic_column: str = "Thema", date_column: str = "Datum"
 ) -> pd.DataFrame:
-    """
-    Removes rows whose topic already appeared in the same year. The first
-    occurrence is kept, so row order decides which source wins.
-    """
+    """Drops topics already seen in the same year; row order decides which occurrence is kept."""
     for col in (topic_column, date_column):
         if col not in input_df.columns:
             print(f"Warning: Column '{col}' not found. No deduplication performed.")
@@ -73,10 +65,7 @@ def clean_df(
     standardize_rounds=True,
     standardize_motions=True,
 ) -> pd.DataFrame:
-    """
-    Removes known 'non-topic' columns from topic dataframe
-
-    """
+    """Drops non-topic rows and normalizes umlauts, round names and motion abbreviations."""
     if column_to_check not in input_df.columns:
         raise ValueError(f"Column '{column_to_check}' not found in DataFrame")
 
@@ -88,7 +77,7 @@ def clean_df(
     new_len = len(out_df)
     print(f"Removed {old_len-new_len} lines according to clean list.")
 
-    # Normalize Umlauts
+    # NFC so composed and decomposed umlauts compare equal
     for col in ("Thema", "Factsheet"):
         if col in out_df.columns:
             out_df[col] = out_df[col].str.normalize("NFC")
@@ -105,9 +94,7 @@ def clean_df(
 
 
 def standardize_df_motions(input_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Uses the translations in data/motion_type_abbreviations.json to expand abbreviations denoting motion types
-    """
+    """Expands motion type abbreviations (e.g. "DHW") using data/motion_type_abbreviations.json."""
     out_df = input_df.copy()
 
     with open(_DATA_DIR / "motion_type_abbreviations.json", "r", encoding="utf-8") as f:
@@ -123,11 +110,7 @@ def standardize_df_motions(input_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_topics_csv(include_old_ddm=True, include_old_list=True) -> pd.DataFrame:
-    """
-    Merges the per-year cache CSVs, cleans the result, and writes both
-    `topics.csv` (the cleaned dataset the site is built from) and
-    `topics_full.csv` (the merged-but-uncleaned cache) to disk.
-    """
+    """Builds topics.csv from the cached per-year csvs and the old topic lists."""
     merged_df = merge_csv_files()
     cleaned_df = clean_df(merged_df)
     cleaned_df = classify_motion_types(cleaned_df)

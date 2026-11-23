@@ -14,28 +14,28 @@ from .round_labels import _split_multi_round_segment
 from .text import _linkify_anchors, _normalize_whitespace
 from .tournament import _extract_tournament_name, _tournament_name_for_section
 
-# Headers that signify the start of a topic section
+# Multi-word heading line ending in a colon, which is never a topic itself
 _SECTION_HEADER_RE = re.compile(r"^[A-Za-zÀ-ÿ]+(?:\s[A-Za-zÀ-ÿ]+)+:$")
+# Intro naming a section's tournament ("Themen der NODM in der Übersicht")
 _SECTION_ABBREVIATION_INTRO_RE = re.compile(
     r"Themen\s+de[rs]\s+([A-ZÄÖÜ]{2,6})\s+in\s+der\s+(?:Übersicht|Ubersicht)",
     re.IGNORECASE,
 )
 
-# Headers that signify something is not a topic section
+# Bold paragraphs that look like section headings but don't name a tournament
 _SECTION_HEADING_BLOCKLIST_RE = re.compile(
     r"break|jur(?:y|ier|or)|tabmaster|casefile|equity|rednerinnen|top\s*\d",
     re.IGNORECASE,
 )
 
+# Longest bold-only paragraph still treated as a section heading
 _SECTION_CITY_PARAGRAPH_MAX_LEN = 40
 
 
 def extract_topics_from_article(
     article: BeautifulSoup, date, url
 ) -> list[dict[str, str]]:
-    """
-    Extracts round/topic/factsheet triples from an article page.
-    """
+    """Extracts round/topic/factsheet entries from an article, tagged with tournament, date and link."""
     sections = _section_headings_by_blockquote(article)
 
     entries = []
@@ -45,7 +45,7 @@ def extract_topics_from_article(
         segments = (
             segment
             for segment in _blockquote_segments(blockquote)
-            # Skip decorative splitters
+            # Skip decorative splitters and headings
             if any(c.isalnum() for c in segment)
             and not _SECTION_HEADER_RE.match(segment)
         )
@@ -55,7 +55,7 @@ def extract_topics_from_article(
 
     title = _extract_title(article)
 
-    # Fallbacks for articles pre-2013 that do not contain blockquotes as topic sections
+    # Pre-2013 articles have no blockquotes, so the fallback parsers are tried in order
     if not blockquotes:
         for fallback in (
             _topic_list_entries,
@@ -80,12 +80,7 @@ def extract_topics_from_article(
 
 
 def _section_headings_by_blockquote(soup: BeautifulSoup) -> dict[int, str]:
-    """
-    Maps each <blockquote> in the article to the name of the
-    tournament section it belongs to, for articles covering multiple
-    regional tournaments in a single post. Returns an empty mapping for
-    ordinary single-tournament articles.
-    """
+    """Maps each blockquote to its tournament in multi-tournament articles, or returns {} otherwise."""
     sections: dict[int, str] = {}
     current: str | None = None
 
@@ -123,10 +118,7 @@ def _section_headings_by_blockquote(soup: BeautifulSoup) -> dict[int, str]:
 
 
 def _blockquote_segments(blockquote) -> list[str]:
-    """
-    Flattens a <blockquote> into logical segments (one topic/factsheet/round
-    label per segment).
-    """
+    """Flattens a blockquote into segments holding one round label, topic or factsheet each."""
     _linkify_anchors(blockquote)
     segments = []
     elements = blockquote.find_all(
@@ -136,11 +128,11 @@ def _blockquote_segments(blockquote) -> list[str]:
     for p in elements:
         current = ""
         br_run = 0
-        # Keeps adjacent highlighted spots together, even when a label is
-        # split across different bold tags ("<b>VR</b><strong>7</strong>:").
+        # Keeps bold runs together, even when a label is split across tags ("<b>VR</b><strong>7</strong>:")
         current_is_strong_only = True
 
         def flush():
+            """Emits the current segment, if any, and starts a new one."""
             nonlocal current, current_is_strong_only
             if current.strip():
                 segments.extend(_split_multi_round_segment(current.strip()))
@@ -160,7 +152,7 @@ def _blockquote_segments(blockquote) -> list[str]:
                 if br_run >= 2:
                     flush()
             elif descendant.name in ("strong", "b"):
-                # Split on a new highlighted spot
+                # A bold run after plain text starts a new segment
                 if not current_is_strong_only:
                     flush()
                 br_run = 0
@@ -169,5 +161,6 @@ def _blockquote_segments(blockquote) -> list[str]:
 
 
 def _extract_title(soup: BeautifulSoup) -> str:
+    """Returns the article's headline."""
     heading = soup.find("h2")
     return _normalize_whitespace(heading.get_text()) if heading else ""

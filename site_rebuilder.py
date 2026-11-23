@@ -1,3 +1,5 @@
+"""Command-line tool for manually regenerating the site."""
+
 import argparse
 
 from new_topic_checker import regenerate_site, regenerate_topics_from_cache

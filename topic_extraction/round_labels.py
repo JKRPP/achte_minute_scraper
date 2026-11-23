@@ -1,17 +1,20 @@
-"""Recognizing round labels ("Runde 1:", "VR2.", ...) and splitting segments on them."""
+"""Recognizes round labels ("Runde 1:", "VR2.", ...) and splits segments on them."""
 
 import re
 
 from .data import _KNOWN_ROUND_LABELS, _KNOWN_ROUND_PREFIXES, _NUMBERED_LABEL_RE
 from .text import _normalize_whitespace
 
+# Word stems of factsheet labels ("Info:", "Factsheet:", ...)
 _LABEL_STEMS = ("info", "fact", "definition", "beispiel")
 
 _LABEL_WORD_RE = re.compile(r"^([A-Za-zÀ-ÿ]+)\s*:?\s*")
 
+# Up to four capitalized words and an optional number ("Runde 1", "Halbfinale"),
+# plus an optional note in parentheses
 _LABEL_GROUP = r"((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß\-]*\s?){1,4}[0-9]{0,3})(?:\s*\([^)]*\))?"
 
-# Don't detect colons as labels if followed by a non-capitalized letter (Polizist:innen)
+# A colon followed by a lowercase letter is a gender colon ("Polizist:innen"), not a label
 _LABEL_COLON = r":(?![a-zäöüß])"
 
 _ROUND_LABEL_LINE_RE = re.compile(
@@ -22,14 +25,12 @@ _INLINE_ROUND_LABEL_LINE_RE = re.compile(
     rf"^\(?{_LABEL_GROUP}\.(?!\s*[a-zäöüß])\s*(.*)$", re.DOTALL
 )
 
+# Round label anywhere in a segment, for splitting glued-together rounds
 _EMBEDDED_ROUND_LABEL_RE = re.compile(rf"(?:^|(?<=\s))\(?{_LABEL_GROUP}{_LABEL_COLON}")
 
 
 def _match_label_stem(text: str) -> re.Match | None:
-    """
-    Matches a leading factsheet-style label word ("Info", "Fact", "Definition",
-    "Beispiel", ...), or returns None if text doesn't start with one.
-    """
+    """Matches a leading factsheet label word ("Info", "Fact", ...), or returns None."""
     match = _LABEL_WORD_RE.match(text)
     if match and match.group(1).lower().startswith(_LABEL_STEMS):
         return match
@@ -37,10 +38,7 @@ def _match_label_stem(text: str) -> re.Match | None:
 
 
 def _split_multi_round_segment(segment: str) -> list[str]:
-    """
-    Splits a segment holding several "Runde N: ..." entries glued together
-    by a single <br> into its different rounds
-    """
+    """Splits a segment holding several rounds glued together by a single <br> into one per round."""
     matches = [
         m
         for m in _EMBEDDED_ROUND_LABEL_RE.finditer(segment)
@@ -57,10 +55,7 @@ def _split_multi_round_segment(segment: str) -> list[str]:
 
 
 def _match_round_label(segment: str) -> re.Match | None:
-    """
-    Remove colon-labels from text until one label matches the expected
-    round label expression
-    """
+    """Matches a leading round label, skipping over non-round colon labels in front of it."""
     match = _ROUND_LABEL_LINE_RE.match(segment)
     while match:
         label = match.group(1)
@@ -73,7 +68,7 @@ def _match_round_label(segment: str) -> re.Match | None:
 
 
 def _is_known_round_label(label: str) -> bool:
-    """Checks whether a matched label is a legitimate round label."""
+    """Checks whether a label is a known round label or a numbered variant of one."""
     normalized = _normalize_whitespace(label).lower()
     if normalized in _KNOWN_ROUND_LABELS:
         return True

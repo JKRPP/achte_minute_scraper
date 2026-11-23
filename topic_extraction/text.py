@@ -8,11 +8,7 @@ _QUOTE_CHARS = "\"'„“”‚‘’«»"
 
 
 def _linkify_anchors(blockquote) -> None:
-    """
-    Replaces <a href="..."> tags with a "[text](href)" markdown-style
-    string, so links formatted as words survive being flattened to
-    plain text.
-    """
+    """Replaces links with "[text](href)" so they survive flattening to plain text."""
     for a in blockquote.find_all("a"):
         href = a.get("href", "").strip()
         text = a.get_text().strip()
@@ -20,14 +16,14 @@ def _linkify_anchors(blockquote) -> None:
 
 
 def _fix_common_typos(text: str) -> str:
-    """Corrects known common typos (see common_typos.json) in a topic/factsheet."""
+    """Corrects known common typos (see common_typos.json) in a topic or factsheet."""
     if not text:
         return text
     return _COMMON_TYPO_RE.sub(lambda m: _COMMON_TYPOS[m.group(0).lower()], text)
 
 
 def _normalize_whitespace(text: str) -> str:
-    """Collapses internal whitespace (e.g. single-<br/> line wraps) to single spaces."""
+    """Collapses whitespace runs to single spaces and trims the result."""
     return re.sub(r"\s+", " ", text).strip()
 
 

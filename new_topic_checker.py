@@ -1,3 +1,5 @@
+"""Detects newly published articles and regenerates the topic data and site."""
+
 import json
 import os
 from datetime import datetime
@@ -11,6 +13,7 @@ from topic_merger import build_topics_csv
 
 
 def check_new_articles():
+    """Returns all of this year's article links if any are new, otherwise an empty list."""
     current_year = datetime.now().year
     link_file = CACHE_DIR / f"{current_year}_links.json"
     if os.path.exists(link_file):
@@ -34,11 +37,7 @@ def check_new_articles():
 
 
 def regenerate_topics_from_cache():
-    """
-    Re-extracts topics for every previously-seen article link, using only
-    the cached HTML in ARTICLE_DIR (no network fetches for articles already
-    downloaded), then rebuilds topics.csv and index.html.
-    """
+    """Re-extracts topics for every known article from the article cache, then rebuilds the site."""
     years_with_link_file = set()
     for link_file in sorted(CACHE_DIR.glob("*_links.json")):
         year = link_file.stem.removesuffix("_links")
@@ -47,6 +46,7 @@ def regenerate_topics_from_cache():
             links = json.load(f)
         _reextract_year(year, links)
 
+    # Years without a link file can only recover their links from the topics csv
     for topics_file in sorted(CACHE_DIR.glob("topics_[0-9][0-9][0-9][0-9].csv")):
         year = topics_file.stem.removeprefix("topics_")
         if year in years_with_link_file:
@@ -64,6 +64,7 @@ def regenerate_topics_from_cache():
 
 
 def _reextract_year(year: str, links: list) -> None:
+    """Re-extracts one year's articles and overwrites its topics csv."""
     print(f"Re-extracting topics for {len(links)} articles from {year}...")
     topic_df = extract_topics_for_links(links)
     topic_df.to_csv(CACHE_DIR / f"topics_{year}.csv", index=False)
@@ -79,16 +80,16 @@ def regenerate_site():
 
 
 def check_and_regenerate():
+    """Re-extracts the current year and rebuilds the site if new articles were published."""
     all_links = check_new_articles()
 
-    ## If there are new links, regenerate the DataFrame for the current year
     if len(all_links) > 0:
         print("Extracting topics from articles...")
         current_year = datetime.now().year
         topic_df = extract_topics_for_links(all_links)
         topic_df.to_csv(CACHE_DIR / f"topics_{current_year}.csv", index=False)
 
-        ## Write the current state of links to the json
+        # Written last, so a failed extraction is retried on the next run
         link_file = CACHE_DIR / f"{current_year}_links.json"
         with open(link_file, "w") as f:
             json.dump(all_links, f)

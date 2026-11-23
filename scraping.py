@@ -1,3 +1,5 @@
+"""Fetches achteminute.de tournament articles and extracts their topics."""
+
 import re
 import time
 from datetime import datetime, timedelta
@@ -18,16 +20,12 @@ _RETRY_BACKOFF_SECONDS = 2
 
 _DATE_IN_URL_RE = re.compile(r"/(\d{8})/")
 
-# WordPress category ID for "Turniere"
+# WordPress category ID of "Turniere"
 _TURNIERE_CATEGORY_ID = 46
 
 
 def _get(url: str) -> httpx.Response:
-    """
-    GETs a URL, retrying on transient connection failures (e.g. "Server
-    disconnected") with a short backoff, since achteminute.de occasionally
-    drops connections under no fault of the request itself.
-    """
+    """GETs a URL, retrying the transient disconnects achteminute.de occasionally causes."""
     _http_client.cookies.clear()
     for attempt in range(1, _MAX_RETRIES + 1):
         try:
@@ -46,19 +44,7 @@ def get_all_article_links(
     end_year: int | None = None,
     end_month: int | None = None,
 ) -> list[str]:
-    """
-    Fetches all article links published in the given date range via the
-    WordPress REST API, filtered to the "Turniere" (tournament) category.
-
-    Args:
-        start_year: The year to start from (default: 2026).
-        start_month: The month to start from (default: 1 for January).
-        end_year: The year to end at (inclusive). If None, uses the current month.
-        end_month: The month to end at (inclusive). If None, uses the current month.
-
-    Returns:
-        A combined list of all article URLs from the specified range.
-    """
+    """Returns all tournament article links between the given months (inclusive), up to now by default."""
     if end_year is None or end_month is None:
         today = datetime.now()
         end_year = today.year
@@ -70,7 +56,7 @@ def get_all_article_links(
         if end_month == 12
         else datetime(end_year, end_month + 1, 1)
     )
-    # Bounds are exclusive, nudged by one second to prevent overlap.
+    # The API's bounds are exclusive, so the start is moved back by one second
     after = (start_date - timedelta(seconds=1)).isoformat()
     before = end_date.isoformat()
 
@@ -89,7 +75,7 @@ def get_all_article_links(
                 f"&per_page=100&page={page}&_fields=link"
             )
         except httpx.HTTPError as e:
-            # WP returns 400 once "page" exceeds the available page count.
+            # WordPress returns 400 once "page" exceeds the page count
             if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 400:
                 break
             print(f"Error fetching article links (page {page}): {e}")
@@ -108,7 +94,7 @@ def get_all_article_links(
 
 
 def extract_date_from_url(url: str) -> str | None:
-    """Article URLs encode their publish date as /YYYYMMDD/ (e.g. /20260521/...)."""
+    """Returns the publish date encoded in an article URL (/YYYYMMDD/) as an ISO date string."""
     match = _DATE_IN_URL_RE.search(url)
     if not match:
         return None
@@ -119,10 +105,7 @@ def extract_date_from_url(url: str) -> str | None:
 
 
 def _extract_article_body(full_soup: BeautifulSoup) -> BeautifulSoup:
-    """
-    Trims a full achteminute.de page down to the article itself (title,
-    date/author/category, body, tags).
-    """
+    """Trims a full page down to the article itself (title, metadata, body and tags)."""
     post = full_soup.find("div", class_="post")
     if post is None:
         return full_soup
@@ -141,6 +124,7 @@ def _extract_article_body(full_soup: BeautifulSoup) -> BeautifulSoup:
 
 
 def download_article(url: str, overwrite=False):
+    """Returns an article's parsed HTML from the cache, downloading and caching it if needed."""
     file_path = ARTICLE_DIR / (
         url.removeprefix("https://www.achteminute.de/")
         .replace("/", "_")
@@ -167,11 +151,7 @@ def download_article(url: str, overwrite=False):
 def extract_topics_for_links(
     links: list[str], show_progress: bool = False
 ) -> pd.DataFrame:
-    """
-    Extracts topics for a list of article links into a single DataFrame,
-    skipping (and logging) any article that fails to extract instead of
-    aborting the whole batch.
-    """
+    """Extracts the topics of all given articles into one DataFrame, skipping articles that fail."""
     all_topics = []
     for link in tqdm(links) if show_progress else links:
         try:
@@ -187,6 +167,7 @@ def extract_topics_for_links(
 
 
 def initial_generation(starting_year=2008, force_regenerate=False, verbose=False):
+    """Writes a topics csv for every year since starting_year, skipping existing ones unless forced."""
     first_year = starting_year
     last_year = datetime.now().year
 

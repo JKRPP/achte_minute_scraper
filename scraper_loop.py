@@ -1,3 +1,5 @@
+"""Long-running scraper: builds the database once, then checks for new articles hourly."""
+
 import time
 import traceback
 
@@ -12,13 +14,10 @@ if __name__ == "__main__":
     print("Generating database")
     initial_generation()
 
-    ## Always re-extract topics from cached articles and rebuild the site on
-    ## startup, so a redeploy with updated scraping/extraction logic is
-    ## reflected immediately without a manual "site_rebuilder.py --from-cache".
+    # Re-extract on every startup so extraction changes take effect on redeploy
     print("Re-extracting topics from cache and regenerating site.")
     regenerate_topics_from_cache()
     while True:
-        ## Check for new topics every hour
         try:
             print("Checking current year for new html generation.")
             check_and_regenerate()
